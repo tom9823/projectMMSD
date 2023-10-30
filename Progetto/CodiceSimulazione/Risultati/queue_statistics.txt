@@ -1,0 +1,7 @@
+Totale pazienti 42503, totale giorni attesa 1730614 (/1661908=1.0413416386466638), media giorni attesa 40.71745523845376, totale day_max 5815, totale cap_max 34204, totale all_max 2484, settimana [8401, 7954, 8511, 7659, 7573, 1776, 629]
+
+Totale pazienti 42503, totale giorni attesa 1730614 (/1661908=1.0413416386466638), media giorni attesa 40.71745523845376, totale day_max 5815, totale cap_max 34204, totale all_max 2484, settimana [8401, 7954, 8511, 7659, 7573, 1776, 629]
+
+---------------------------
+Totale pazienti 83462, totale giorni attesa 6245205 (/1661908=3.7578524202302415), media giorni attesa 74.82692722436558, totale day_max 11394, totale cap_max 67284, totale all_max 4784, settimana [16786, 15614, 16162, 15130, 14988, 3508, 1274]
+
