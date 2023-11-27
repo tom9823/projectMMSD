@@ -8,6 +8,8 @@ Created on Tue Jan  5 12:57:59 2021
 import datetime
 import time
 
+import pandas as pd
+
 import save_info
 import parser_data
 import utility_functions as uf
@@ -98,10 +100,12 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 
         # Controllo se è cambiato l'anno
         if not hospitalization_day_dataframe.empty:
-            new_date = str(hospitalization_day_dataframe['data_ricovero'].iloc[0]).split(" ")[0]
-            new_year = int(new_date.split("-")[0])
+            # se il dataframe di ricovero giornaliero non è vuoto singifica che sono ancora nell'anno corrente
+            new_date = hospitalization_day_dataframe['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
+            new_year = pd.to_datetime(new_date).year
             first_date = new_date
         else:
+            #se il dataframe è vuoto significa che l'anno è cambiato per cui incremento di un giorno la data
             first_date = datetime.datetime.strptime(str(first_date), '%Y-%m-%simulation_day_index')
             tmp_day = first_date + datetime.timedelta(days=1)
             new_date = str(tmp_day).split(" ")[0]
@@ -153,7 +157,8 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                 policy_resources[1], policy_resources[2],
                                                                 policy_resources[3], solver, time_limit, optimizer_type)
                 hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
-
+                for df in new_anticipated_days:
+                    print("DATAFRAME\n", df.isna().any(), "\n")
         # Decremento i giorni di degenza, poi levo i pazienti a 0 giorni di
         # degenza.
         for h in hosp_list:
@@ -164,7 +169,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 
         # Controllo se posso ricoverare i pazienti nella lista di attesa
         for h in hosp_list:
-            if h.waiting_queue != []:
+            if h.waiting_queue:
                 for p in h.waiting_queue:
                     if len(h.rest_queue) < int(h.capacity[7]):
                         if h.counter_day_cap < int(h.capacity[day_of_the_week_number]):
@@ -176,7 +181,6 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                )
                             p.patient_true_day_recovery = new_date
                             queue_info.append([p, h])
-
         # Controllo se posso ricoverare i nuovi pazienti
         for index, hospitalization_record in hospitalization_day_dataframe.iterrows():
             # Leggo e salvo le info del paziente
@@ -198,7 +202,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             
             hospitalization_record_rest_time = int(hospitalization_record.loc['gg_degenza'])
 
-            hospitalization_record_recovery_date = str(hospitalization_record['data_ricovero']).split(" ")[0]
+            hospitalization_record_recovery_date = hospitalization_record['data_ricovero'].strftime("%Y-%m-%d")
 
             # Creo l'oggetto paziente con tutte le info
             current_hospitalization_patient_object = oc.Patient(index, hospitalization_record_rest_time,

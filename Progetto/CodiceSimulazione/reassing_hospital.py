@@ -25,16 +25,19 @@ def __find_distance(id_pat, id_hosp, map_com_hosp, dict_distances, dict_map_resi
     return int(dis)
 
 
-def calc_pat_to_reassing(anticipated_days, hosp_id_list, hosp_spec_list):
+def calc_pat_to_reassign(hospitalization_day_dataframe_list, hosp_id_list, hosp_spec_id_list):
     # Creo la lista dei pazienti che devono essere riassegnati
-    patient_to_reassing = []
-    for next_day in anticipated_days:
-        for _, patient in next_day.iterrows():
-            patient_id_hosp = patient.loc['codice_struttura_erogante']
-            patient_id_spec = patient.loc['COD_BRANCA']
-            if (int(patient_id_hosp) in hosp_id_list) or (patient_id_spec in hosp_spec_list):
-                patient_to_reassing.append(patient)
-    return patient_to_reassing
+    patient_to_reassign_dict = {}
+    for next_day in hospitalization_day_dataframe_list:
+        for index, hospitalization in next_day.iterrows():
+            patient_id_hosp = hospitalization.loc['codice_struttura_erogante']
+            patient_id_spec = hospitalization.loc['COD_BRANCA']
+
+            if (int(patient_id_hosp) in hosp_id_list) or (int(patient_id_spec) in hosp_spec_id_list):
+                patient_to_reassign_dict[index] = hospitalization
+
+        # Concatena tutti i DataFrame presenti nella lista senza ignorare l'indice
+    return pd.DataFrame.from_dict(patient_to_reassign_dict, orient='index')
 
 
 def rest_days(patient_to_reassing):
@@ -132,24 +135,25 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
                           closing_hosp_id_list, closing_spec_list, hosp_list, dict_mapping,
                           dict_distances, dict_map_residenza, map_com_hosp, solver, time_limit, optimizer_type):
     new_list_hosp = []
+
     # Prendo una finestra di dataframe
-    hospitalization_day_to_reassign_list = hospitalization_day_list[
+    hospitalization_day_to_reassign_dataframe_list = hospitalization_day_list[
                                            simulation_day_index:upper_threshold_simulation_day_index]
-    # Lista dei pazienti da riassegnare
-    hospitalization_to_reassign_list = calc_pat_to_reassing(hospitalization_day_to_reassign_list, closing_hosp_id_list,
-                                                            closing_spec_list)
-    print(f'DENTRO: {simulation_day_index}. Num pazienti: {len(hospitalization_to_reassign_list)}')
-    if hospitalization_to_reassign_list != []:
-        hospitalization_to_reassign_dataframe = pd.DataFrame(hospitalization_to_reassign_list)
+    # Lista dei ricoveri in cui i pazienti sono da riassegnare
+    hospitalization_to_reassign_dataframe_compat = calc_pat_to_reassign(hospitalization_day_to_reassign_dataframe_list,closing_hosp_id_list, closing_spec_list)
+    print(f'SIMULATION DAY INDEX: {simulation_day_index}. Num pazienti: {sum(len(df) for df in hospitalization_to_reassign_dataframe_compat)}')
+
+    if not hospitalization_to_reassign_dataframe_compat.empty:
+
         # Li divido per specialità per poter utilizzare l'ottimizzatore su gruppi omogenei
-        pats = hospitalization_to_reassign_dataframe.groupby('COD_BRANCA')
-        hospitalization_by_spec_list = [pats.get_group(x) for x in pats.groups]
+        hospitalization_by_spec_dataframe_list = [hospitalization_to_reassign_dataframe_compat[hospitalization_to_reassign_dataframe_compat['COD_BRANCA'] == valore].copy() for valore in hospitalization_to_reassign_dataframe_compat['COD_BRANCA'].unique()]
+
         # Per ogni specialità calcolo un modello
         print(
-            f'Gruppi di specialità: {len(hospitalization_by_spec_list)}. Totale pazienti: {uf.count_total_patient(hospitalization_by_spec_list)}.')
+            f'Gruppi di specialità: {len(hospitalization_by_spec_dataframe_list)}. Totale pazienti: {uf.count_total_patient(hospitalization_by_spec_dataframe_list)}.')
         spec_counter = 1
-        spec_count = len(hospitalization_by_spec_list)
-        for hospitalization_by_spec_dataframe in hospitalization_by_spec_list:
+        spec_count = len(hospitalization_by_spec_dataframe_list)
+        for hospitalization_by_spec_dataframe in hospitalization_by_spec_dataframe_list:
             current_spec_id = hospitalization_by_spec_dataframe['COD_BRANCA'].iloc[0]
             # print(current_spec_id)
             print(
@@ -198,11 +202,15 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
             spec_counter += 1
 
         # sostituisco i vecchi pazienti con i pazienti con dati aggiornati
-        # print(f'Inizio sostituzione. Lunghezza t: {len(new_list_hosp)}. Lunghezza d: {len(hospitalization_day_to_reassign_list)}.Lunghezza row: {len(hospitalization_day_to_reassign_list[0])}.Lunghezza row: {len(hospitalization_day_to_reassign_list[1])}')
+        # print(f'Inizio sostituzione. Lunghezza t: {len(new_list_hosp)}. Lunghezza d: {len(hospitalization_day_to_reassign_dataframe_list)}.Lunghezza row: {len(hospitalization_day_to_reassign_dataframe_list[0])}.Lunghezza row: {len(hospitalization_day_to_reassign_dataframe_list[1])}')
         for t in new_list_hosp:
-            for hospitalization_day_to_reassign_dataframe in hospitalization_day_to_reassign_list:
-                if(t[0] == 'n_record'):
+            print(list(map(type, t)))
+            for hospitalization_day_to_reassign_dataframe in hospitalization_day_to_reassign_dataframe_list:
+                if t[0] == 'n_record':
                     print('trovato')
-                else:
-                    hospitalization_day_to_reassign_dataframe.loc[t[0], 'codice_struttura_erogante'] = '0' + str(t[1])
-    return hospitalization_day_to_reassign_list
+                elif t[0] in hospitalization_day_to_reassign_dataframe.index:
+                    hospitalization_day_to_reassign_dataframe.at[t[0], 'codice_struttura_erogante'] = '0' + str(t[1])
+    for df in hospitalization_day_to_reassign_dataframe_list:
+        print("DATAFRAME\n", df.isna().any(), "\n")
+
+    return hospitalization_day_to_reassign_dataframe_list

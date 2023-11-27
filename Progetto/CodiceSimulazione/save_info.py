@@ -9,7 +9,7 @@ from datetime import date
 
 
 def create_day_log(patient_day_list, hosp_list, spurious_days, name):
-    with open('../Simulazione/Risultati/log_day_' + name +'.txt', 'w') as log:
+    with open('../CodiceSimulazione/Risultati/log_day_' + name +'.txt', 'w') as log:
         i1 = len(patient_day_list)
         i2 = len(hosp_list)
         print(f"Il numero totale di giorni è {i1} e il numero di specialità è"
@@ -17,17 +17,17 @@ def create_day_log(patient_day_list, hosp_list, spurious_days, name):
 
 
 def create_queue_info(name):
-    with open('../Simulazione/Risultati/queue_info_' + name + '.txt', 'w') as q:
+    with open('../CodiceSimulazione/Risultati/queue_info_' + name + '.txt', 'w') as q:
         print(f"Numero coda indica quanto ha sforato il paziente", file=q)
 
 
 def create_anticipated_queue(name):
-    with open('../Simulazione/Risultati/anticipated_queue_info_' + name + '.txt', 'w') as q:
+    with open('../CodiceSimulazione/Risultati/anticipated_queue_info_' + name + '.txt', 'w') as q:
         print(f"Lista dei pazienti ricoverati in anticipo", file=q)
 
 
 def save_day_info(hosp_list, day, weekday, name):
-    with open('../Simulazione/Risultati/log_day_' + name + '.txt', 'a') as log:
+    with open('../CodiceSimulazione/Risultati/log_day_' + name + '.txt', 'a') as log:
         for h in hosp_list:
             i1 = len(h.rest_queue)
             i2 = h.capacity[7]
@@ -41,7 +41,7 @@ def save_day_info(hosp_list, day, weekday, name):
 
 
 def save_queue_info(queue_info, day, name):
-    with open('../Simulazione/Risultati/queue_info_' + name + '.txt', 'a') as info:
+    with open('../CodiceSimulazione/Risultati/queue_info_' + name + '.txt', 'a') as info:
         for p in queue_info:
             if p[0].patient_day_recovery != p[0].patient_true_day_recovery:
                 i1 = p[0].id_patient
@@ -68,7 +68,7 @@ def save_queue_info(queue_info, day, name):
 
 
 def anticipated_patient(queue_anticipated_days, name):
-    with open('../Simulazione/Risultati/anticipated_queue_info_' + name + '.txt', 'a') as info:
+    with open('../CodiceSimulazione/Risultati/anticipated_queue_info_' + name + '.txt', 'a') as info:
         for p in queue_anticipated_days:
             i1 = p.id_patient
             i2 = p.patient_day_recovery
@@ -87,6 +87,6 @@ def anticipated_patient(queue_anticipated_days, name):
 
 
 def save_lista_comuni_mancanti(lista_comuni_mancanti, name):
-    with open('../Simulazione/Risultati/lista_comuni_mancanti_' + name + '.txt', 'w') as l:
+    with open('../CodiceSimulazione/Risultati/lista_comuni_mancanti_' + name + '.txt', 'w') as l:
         for c in lista_comuni_mancanti:
             print(f"Comune: {c[0]}, ospedale: {c[1]}", file=l)
