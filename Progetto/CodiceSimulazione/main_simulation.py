@@ -55,7 +55,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # Creo la lista degli ospedali
     hosp_list = uf.create_hospital_list(hosp_dict, old_year)
 
-    print("Totale giorni: "+str(len(hospitalization_day_list)))
+    print("Totale giorni: " + str(len(hospitalization_day_list)))
 
     # Variabili Simulazione.
     # giorni di attesa prima che il sistema arrivi ad una condizione di
@@ -157,8 +157,6 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                 policy_resources[1], policy_resources[2],
                                                                 policy_resources[3], solver, time_limit, optimizer_type)
                 hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
-                for df in new_anticipated_days:
-                    print("DATAFRAME\n", df.isna().any(), "\n")
         # Decremento i giorni di degenza, poi levo i pazienti a 0 giorni di
         # degenza.
         for h in hosp_list:

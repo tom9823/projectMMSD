@@ -204,13 +204,8 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
         # sostituisco i vecchi pazienti con i pazienti con dati aggiornati
         # print(f'Inizio sostituzione. Lunghezza t: {len(new_list_hosp)}. Lunghezza d: {len(hospitalization_day_to_reassign_dataframe_list)}.Lunghezza row: {len(hospitalization_day_to_reassign_dataframe_list[0])}.Lunghezza row: {len(hospitalization_day_to_reassign_dataframe_list[1])}')
         for t in new_list_hosp:
-            print(list(map(type, t)))
             for hospitalization_day_to_reassign_dataframe in hospitalization_day_to_reassign_dataframe_list:
-                if t[0] == 'n_record':
-                    print('trovato')
-                elif t[0] in hospitalization_day_to_reassign_dataframe.index:
+                if t[0] in hospitalization_day_to_reassign_dataframe.index:
                     hospitalization_day_to_reassign_dataframe.at[t[0], 'codice_struttura_erogante'] = '0' + str(t[1])
-    for df in hospitalization_day_to_reassign_dataframe_list:
-        print("DATAFRAME\n", df.isna().any(), "\n")
 
     return hospitalization_day_to_reassign_dataframe_list
