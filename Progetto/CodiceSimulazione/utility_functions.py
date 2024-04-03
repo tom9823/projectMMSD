@@ -87,7 +87,7 @@ def create_hospital_list(hosp_dict, year):
     new_hosp_list = []
     for h in hosp_dict:
         for s in hosp_dict[h][year]:
-            new_hosp_list.append(oc.Hospital(int(h), s, hosp_dict[h][year][s]))
+            new_hosp_list.append(oc.HospitalSpeciality(int(h), s, hosp_dict[h][year][s]))
 
     return new_hosp_list
 

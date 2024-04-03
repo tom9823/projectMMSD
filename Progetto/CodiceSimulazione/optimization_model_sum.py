@@ -1,4 +1,5 @@
-from pyomo.environ import *
+from gettext import install
+
 from pyomo.opt import *
 import pyomo.environ as pyo
 
@@ -42,7 +43,6 @@ def discomfort_calculation(m, p, h):
 def create_model(data, solver, time_limit):
     #print(f'Inizio modello')
     model = pyo.AbstractModel()
-    opt = solvers.SolverFactory(solver) 
     opt = solvers.SolverFactory(solver)
     if solver == 'cplex':
       opt.options['timelimit'] = time_limit
