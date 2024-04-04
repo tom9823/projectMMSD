@@ -34,7 +34,7 @@ def save_day_info(hosp_list, day, weekday, name):
             i3 = len(h.waiting_queue)
             i4 = h.capacity[weekday]
             print(f"Giorno {day}, ospedale {h.id_hosp}, specialità {h.id_spec},"
-                  f" ricoveri {h.counter_patients_recovered_day}/{i4}, letti occupati"
+                  f" ricoveri {h.counter_current_day_patients_recovered}/{i4}, letti occupati"
                   f" {i1}/{i2}, coda attesa {i3}",
                   file=log)
         print(f"\n", file=log)

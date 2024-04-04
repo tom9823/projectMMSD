@@ -1,6 +1,17 @@
+from enum import IntEnum
+
+
+class OptimizerModelType(IntEnum):
+    NORM_1 = 1
+    NORM_2 = 2
+    NORM_INF = 0
+
+
 """
 Insieme di tutte le classi utili per la simulazione
 """
+
+
 class HospitalSpeciality():
     """Classe per la creazione dell'oggetto Ospedale."""
 
@@ -8,9 +19,9 @@ class HospitalSpeciality():
         self.id_hosp = id_hosp
         self.id_spec = id_spec
         self.capacity = capacity  # lista lunga 8 valori (i primi 7 elementi sono i pazienti ricoverabili nei primi 7 rispettivi giorni della settimana, l'ttavo leemento è il numero massimo di posti letto dell'ospedale)
-        self.waiting_queue = [] # lista di pazienti in attesa per quella specialità s dell'ospedale h
+        self.waiting_queue = []  # lista di pazienti in attesa per quella specialità s dell'ospedale h
         self.counter_patients_recovered_day = 0
-        self.rest_queue = [] # lista pzienti in degenza
+        self.rest_queue = []  # lista pzienti in degenza
         self.counter_day_queue = 0
         self.counter_max_queue = 0
 

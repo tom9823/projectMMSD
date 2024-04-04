@@ -4,6 +4,8 @@ import optimization_model_delta as omd
 import utility_functions as uf
 from pyomo.opt import *
 
+from Progetto.CodiceSimulazione.objects_classes import OptimizerModelType
+
 
 def __find_distance(id_pat, id_hosp, map_com_hosp, dict_distances, dict_map_residenza):
     # Dato un id_paziente e id_ospedale restituisce la distanza dal comune del paziente a 
@@ -133,7 +135,7 @@ def create_data(l, p, H, m, d, gamma):
 
 def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list,
                           closing_hosp_id_list, closing_spec_list, hosp_list, dict_mapping,
-                          dict_distances, dict_map_residenza, map_com_hosp, solver, time_limit, optimizer_type):
+                          dict_distances, dict_map_residenza, map_com_hosp, solver, time_limit, optimizer_model_type):
     new_list_hosp = []
 
     # Prendo una finestra di dataframe
@@ -178,19 +180,23 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
             gamma = calculate_gamma(l, H, hosp_list, current_spec_id, alfa)
             data = create_data(l, p, H, m, d, gamma)
             # Calcolo il modello
-            if optimizer_type == 0:
+            if optimizer_model_type == OptimizerModelType.NORM_1:
                 results, model = oms.create_model(data, solver, time_limit)
-            else:
+            elif optimizer_model_type == OptimizerModelType.NORM_2:
+                results, model = omd.create_model(data, solver, time_limit)
+            elif optimizer_model_type == OptimizerModelType.NORM_INF:
                 results, model = omd.create_model(data, solver, time_limit)
             list_of_alfa = []
             list_of_alfa.append([alfa, hospitalization_by_spec_dataframe])
-            while (results.solver.termination_condition == TerminationCondition.infeasible):
+            while results.solver.termination_condition == TerminationCondition.infeasible:
                 alfa += 0.5
                 gamma = calculate_gamma(l, H, hosp_list, current_spec_id, alfa)
                 data = create_data(l, p, H, m, d, gamma)
-                if optimizer_type == 0:
+                if optimizer_model_type == OptimizerModelType.NORM_1:
                     results, model = oms.create_model(data, solver, time_limit)
-                else:
+                elif optimizer_model_type == OptimizerModelType.NORM_2:
+                    results, model = omd.create_model(data, solver, time_limit)
+                elif optimizer_model_type == OptimizerModelType.NORM_INF:
                     results, model = omd.create_model(data, solver, time_limit)
                 list_of_alfa.append([alfa, hospitalization_by_spec_dataframe])
 
