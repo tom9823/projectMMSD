@@ -180,24 +180,18 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
             gamma = calculate_gamma(l, H, hosp_list, current_spec_id, alfa)
             data = create_data(l, p, H, m, d, gamma)
             # Calcolo il modello
-            if optimizer_model_type == OptimizerModelType.NORM_1:
-                results, model = oms.create_model(data, solver, time_limit)
-            elif optimizer_model_type == OptimizerModelType.NORM_2:
-                results, model = omd.create_model(data, solver, time_limit)
-            elif optimizer_model_type == OptimizerModelType.NORM_INF:
-                results, model = omd.create_model(data, solver, time_limit)
+
+            results, model = oms.create_model(data, solver, time_limit, optimizer_model_type)
+
             list_of_alfa = []
             list_of_alfa.append([alfa, hospitalization_by_spec_dataframe])
             while results.solver.termination_condition == TerminationCondition.infeasible:
                 alfa += 0.5
                 gamma = calculate_gamma(l, H, hosp_list, current_spec_id, alfa)
                 data = create_data(l, p, H, m, d, gamma)
-                if optimizer_model_type == OptimizerModelType.NORM_1:
-                    results, model = oms.create_model(data, solver, time_limit)
-                elif optimizer_model_type == OptimizerModelType.NORM_2:
-                    results, model = omd.create_model(data, solver, time_limit)
-                elif optimizer_model_type == OptimizerModelType.NORM_INF:
-                    results, model = omd.create_model(data, solver, time_limit)
+
+                results, model = oms.create_model(data, solver, time_limit, optimizer_model_type)
+
                 list_of_alfa.append([alfa, hospitalization_by_spec_dataframe])
 
             # Aggiorno new_list_hosp con le tuple (id_paz,id_ospedale)

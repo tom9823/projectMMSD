@@ -1,7 +1,11 @@
 from gettext import install
+from math import sqrt
 
+import numpy as np
 from pyomo.opt import *
 import pyomo.environ as pyo
+
+from Progetto.CodiceSimulazione.objects_classes import OptimizerModelType
 
 """
 Legenda del modello.
@@ -30,8 +34,12 @@ d = distanze con i nuovi ospedali
 """
 
 # Variabile obbiettivo 
-def obj_expression(m):
+def obj_expression_norm_1(m):
     return pyo.summation(m.delta)
+def obj_expression_norm_2(m):
+    return sqrt(pyo.summation(m.delta**2))
+def obj_expression_norm_inf(m):
+    return max(m.delta)
 # Vincoli
 def patient_in_only_one_hospital(m, p):
     return sum(m.x[p,h] for h in m.H) == 1
@@ -40,7 +48,9 @@ def patients_redistribution(m, h):
 def discomfort_calculation(m, p, h):
     return m.delta[p] >= (m.d[p,h]-m.m[p])*m.x[p,h]
 
-def create_model(data, solver, time_limit):
+def create_model(data, solver, time_limit, optimizer_model_type):
+
+
     #print(f'Inizio modello')
     model = pyo.AbstractModel()
     opt = solvers.SolverFactory(solver)
@@ -61,7 +71,12 @@ def create_model(data, solver, time_limit):
     # Variabili
     model.x = pyo.Var(model.P, model.H, domain=pyo.Binary)
     model.delta = pyo.Var(model.P, domain=pyo.NonNegativeReals)
-    model.OBJ = pyo.Objective(rule=obj_expression)
+    if optimizer_model_type == OptimizerModelType.NORM_1:
+        model.OBJ = pyo.Objective(rule=obj_expression_norm_1)
+    elif optimizer_model_type == OptimizerModelType.NORM_2:
+        model.OBJ = pyo.Objective(rule=obj_expression_norm_2)
+    elif optimizer_model_type == OptimizerModelType.NORM_INF:
+        model.OBJ = pyo.Objective(rule=obj_expression_norm_inf)
 
     model.PatientInOnlyOneHospital = pyo.Constraint(model.P, rule=patient_in_only_one_hospital)
     model.PatientsRedistribution = pyo.Constraint(model.H, rule=patients_redistribution)
