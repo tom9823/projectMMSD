@@ -69,7 +69,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # flag di blocco del riassegnamento greedy. Mettere False per usare l'ottimizzatore
     is_optimizer_off = False
     # quale modello utilizzare per l'ottimizzatore. 0 per la somma e 1 per il delta
-    optimizer_model_type = oc.OptimizerModelType.NORM_INF
+    optimizer_model_type = oc.OptimizerModelType.NORM_2
     #  Flag per rimuovere le risorse solo una volta. Mettere a False se l'ottimizzatore è attivo
     flg_alt_remove = False
     
