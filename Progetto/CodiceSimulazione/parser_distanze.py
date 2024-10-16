@@ -201,6 +201,7 @@ def dict_recod_residenza():
     final_dict = {}
     final_dict = dict([(i,[a,b]) for i, a,b in zip(res.id_record, res.nome_comune_residenza,res.id_comune)])
     joblib.dump(final_dict, '../DatiOriginali/map_pat_idComRes')
+    return final_dict
 
 if __name__ == '__main__':
     ppath = "Dati/"

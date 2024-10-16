@@ -69,7 +69,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # flag di blocco del riassegnamento greedy. Mettere False per usare l'ottimizzatore
     is_optimizer_off = False
     # quale modello utilizzare per l'ottimizzatore. 0 per la somma e 1 per il delta
-    optimizer_model_type = oc.OptimizerModelType.NORM_INF
+    optimizer_model_type = oc.OptimizerModelType.NORM_2
     #  Flag per rimuovere le risorse solo una volta. Mettere a False se l'ottimizzatore è attivo
     flg_alt_remove = False
     
@@ -349,13 +349,14 @@ if __name__ == '__main__':
     name = 'SOMMA'
     # Caricamento dei dati di partenza
     resources, patients = parser_data.load_data()
-    patients = patients.set_index('n_record')
+    patients = patients.set_index('n_record') # le colonne dei giorni indicano il numero di pazienti ricoverabili nel giorno stesso mentre l'ultima colonna K_MAX indica la capacità giornaliera per poterli curare4++++
     hosp_dict = parser_data.load_hosp_dict(resources)
-    # leggo file in cui sono definiti le risorse(ospedale con relativa specialità) dachiudere e date chiusura
+    # leggo file in cui sono definiti le risorse(ospedale con relativa specialità) da chiudere e date chiusura
     file = "../Parametri/remove_info.txt"
     hosp_id_list, hosp_spec_list, date = rr.read_input(file)
+    #dizionario che mappa comune con ospedale
     dict_mapping_hospital_com, dict_distances_com = parser_data.load_policy_data()
-    # stesso dizionario di dict_mapping ma con chiave valore invertito
+    # stesso dizionario di dict_mapping ma con chiave valore invertito (inverso di quello sopra)
     dict_mapping_com_hospital = {v: k for k, v in dict_mapping_hospital_com.items()}
     #Solver del modello di ottimizzazione
     solver = "glpk"

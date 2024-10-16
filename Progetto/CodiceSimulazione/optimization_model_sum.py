@@ -38,14 +38,11 @@ d = distanze con i nuovi ospedali
 def obj_expression_norm_1(m):
     return pyo.summation(m.delta)
 
-
 def obj_expression_norm_2(m):
     return pyo.sqrt(sum(m.delta[p] ** 2 for p in m.P))
 
-
 def obj_expression_norm_inf(m):
     return max(m.delta)
-
 
 # Vincoli
 def patient_in_only_one_hospital(m, p):
