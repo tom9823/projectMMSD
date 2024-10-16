@@ -173,6 +173,7 @@ def dict_mapping():
         final_dict[row.iloc[0]] = row.iloc[1]
     joblib.dump(final_dict, '../DatiElaborati/mappingOspCom')
 
+# nei ricoveri abbiamo associazione tra paziente e nome del comune per cui dobbiamo estrarre i nomi dei comuni di residenza dei pazienti
 def dict_recod_residenza():
     # Creo il dizionario di mapping tra id del record del paziente e l'id del comune di residenza.
     # Avrò {id_r:id_residenza}, avrò bisogno del file di mapping tra nome del comune e suo id.
@@ -183,6 +184,9 @@ def dict_recod_residenza():
 
     df_concat = pd.concat([df_2011, df_2012, df_2013], axis=0, join='outer', ignore_index=False)
     df_concat['nome_comune_residenza'] = df_concat['nome_comune_residenza'].str.lower()
+    # per rimuovere gli spazi dai nomi delle città
+    df_concat['nome_comune_residenza'] = "".join(df_concat['nome_comune_residenza'].str.split())
+
     #print(len(set(df_concat['id_record'])))
     #print(df_concat['nome_comune_residenza'])
     try: 
@@ -194,6 +198,7 @@ def dict_recod_residenza():
     
     comuni_ita.columns = ['id_comune', 'nome_comune_residenza']
     comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.lower()
+    comuni_ita['nome_comune_residenza'] = "".join(comuni_ita['nome_comune_residenza'].str.split())
     #print(comuni_ita['nome_comune_residenza'])
     
     res = pd.merge(df_concat, comuni_ita, on='nome_comune_residenza')
