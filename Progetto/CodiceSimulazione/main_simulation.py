@@ -69,7 +69,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # flag di blocco del riassegnamento greedy. Mettere False per usare l'ottimizzatore
     is_optimizer_off = False
     # quale modello utilizzare per l'ottimizzatore. 0 per la somma e 1 per il delta
-    optimizer_model_type = oc.OptimizerModelType.NORM_2
+    optimizer_model_type = oc.OptimizerModelType.NORM_INF
     #  Flag per rimuovere le risorse solo una volta. Mettere a False se l'ottimizzatore è attivo
     flg_alt_remove = False
     
@@ -351,12 +351,12 @@ if __name__ == '__main__':
     resources, patients = parser_data.load_data()
     patients = patients.set_index('n_record')
     hosp_dict = parser_data.load_hosp_dict(resources)
-    # parte sulle risorse da eliminare
+    # leggo file in cui sono definiti le risorse(ospedale con relativa specialità) dachiudere e date chiusura
     file = "../Parametri/remove_info.txt"
     hosp_id_list, hosp_spec_list, date = rr.read_input(file)
-    dict_mapping, dict_distances = parser_data.load_policy_data()
+    dict_mapping_hospital_com, dict_distances_com = parser_data.load_policy_data()
     # stesso dizionario di dict_mapping ma con chiave valore invertito
-    map_com_hosp = {v: k for k, v in dict_mapping.items()}
+    dict_mapping_com_hospital = {v: k for k, v in dict_mapping_hospital_com.items()}
     #Solver del modello di ottimizzazione
     solver = "glpk"
     #Tempo in secondi a disposizione del solver
@@ -364,5 +364,5 @@ if __name__ == '__main__':
     # dizionario per la residenza del paziente
     dict_map_residenza = parser_data.load_residenze()
     
-    start_simulation(patients, hosp_dict, [hosp_id_list, hosp_spec_list, date], [dict_mapping, 
-                    dict_distances, map_com_hosp, dict_map_residenza], solver, time_limit, name)
+    start_simulation(patients, hosp_dict, [hosp_id_list, hosp_spec_list, date], [dict_mapping_hospital_com,
+                                                                                 dict_distances_com, dict_mapping_com_hospital, dict_map_residenza], solver, time_limit, name)

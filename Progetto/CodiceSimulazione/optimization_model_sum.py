@@ -33,33 +33,43 @@ m = distanza del vecchio ospedale
 d = distanze con i nuovi ospedali
 """
 
-# Variabile obbiettivo 
+
+# Variabile obbiettivo
 def obj_expression_norm_1(m):
     return pyo.summation(m.delta)
+
+
 def obj_expression_norm_2(m):
-    return sqrt(pyo.summation(m.delta**2))
+    return pyo.sqrt(sum(m.delta[p] ** 2 for p in m.P))
+
+
 def obj_expression_norm_inf(m):
     return max(m.delta)
+
+
 # Vincoli
 def patient_in_only_one_hospital(m, p):
-    return sum(m.x[p,h] for h in m.H) == 1
+    return sum(m.x[p, h] for h in m.H) == 1
+
+
 def patients_redistribution(m, h):
-    return sum(m.l[p] * m.x[p,h] for p in m.P) <= m.gamma[h]
+    return sum(m.l[p] * m.x[p, h] for p in m.P) <= m.gamma[h]
+
+
 def discomfort_calculation(m, p, h):
-    return m.delta[p] >= (m.d[p,h]-m.m[p])*m.x[p,h]
+    return m.delta[p] >= (m.d[p, h] - m.m[p]) * m.x[p, h]
+
 
 def create_model(data, solver, time_limit, optimizer_model_type):
-
-
-    #print(f'Inizio modello')
+    # print(f'Inizio modello')
     model = pyo.AbstractModel()
     opt = solvers.SolverFactory(solver)
     if solver == 'cplex':
-      opt.options['timelimit'] = time_limit
-    elif solver == 'glpk':         
-      opt.options['tmlim'] = time_limit
-    elif solver == 'gurobi':           
-      opt.options['TimeLimit'] = time_limit
+        opt.options['timelimit'] = time_limit
+    elif solver == 'glpk':
+        opt.options['tmlim'] = time_limit
+    elif solver == 'gurobi':
+        opt.options['TimeLimit'] = time_limit
     # Parametri
     model.P = pyo.Set(within=pyo.NonNegativeIntegers)
     model.H = pyo.Set(within=pyo.NonNegativeIntegers)
@@ -82,13 +92,14 @@ def create_model(data, solver, time_limit, optimizer_model_type):
     model.PatientsRedistribution = pyo.Constraint(model.H, rule=patients_redistribution)
     model.DiscomfortCalculation = pyo.Constraint(model.P, model.H, rule=discomfort_calculation)
     model_instance = model.create_instance(data)
-    #model_instance.pprint()
-    results = opt.solve(model_instance) # Solving del modello  
+    # model_instance.pprint()
+    results = opt.solve(model_instance)  # Solving del modello
 
-    if (results.solver.status == SolverStatus.ok) and (results.solver.termination_condition == TerminationCondition.optimal):
+    if (results.solver.status == SolverStatus.ok) and (
+            results.solver.termination_condition == TerminationCondition.optimal):
         return results, model_instance
     elif (results.solver.termination_condition == TerminationCondition.infeasible):
-        #print(f'Modello infeasible')
+        # print(f'Modello infeasible')
         return results, model_instance
     else:
         print(f'Solver Status: {results.solver.status}')
