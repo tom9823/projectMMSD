@@ -68,8 +68,8 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     capacity_threshold = 13
     # flag di blocco del riassegnamento greedy. Mettere False per usare l'ottimizzatore
     is_optimizer_off = False
-    # quale modello utilizzare per l'ottimizzatore. 0 per la somma e 1 per il delta
-    optimizer_model_type = oc.OptimizerModelType.NORM_2
+    # quale modello utilizzare per l'ottimizzatore.
+    optimizer_model_type = oc.OptimizerModelType.NORM_INF
     #  Flag per rimuovere le risorse solo una volta. Mettere a False se l'ottimizzatore è attivo
     flg_alt_remove = False
     
@@ -93,14 +93,16 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # Inizio della simulazione
     start_time_simulation = time.time()
     print("INIZIO SIMULAZIONE", start_time_simulation)
+    for i, df in enumerate(hospitalization_day_list):
+        if df.empty:
+            print(f"Il DataFrame vuoto si trova all'indice {i}")
     for hospitalization_day_dataframe in hospitalization_day_list:
         queue_info = []
         list_anticipated_patients = []
-        print("Giorno: "+str(simulation_day_index))
-        print("Gestisco le date")
+        print("Giorno: "+ str(simulation_day_index))
         # Controllo se è cambiato l'anno
         if not hospitalization_day_dataframe.empty:
-            # se il dataframe di ricovero giornaliero non è vuoto singifica che sono ancora nell'anno precedente
+            # se il dataframe di ricovero giornaliero non è vuoto significa che sono ancora nell'anno precedente
             current_date_simulation = hospitalization_day_dataframe['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
             current_year_simulation = pd.to_datetime(current_date_simulation).year
             first_date = current_date_simulation
@@ -111,12 +113,13 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             current_date_simulation = tmp_day.strftime("%Y-%m-%d")
             current_year_simulation = pd.to_datetime(current_date_simulation).year
             first_date = current_date_simulation
+        print(f"current_date_simulation: {current_date_simulation}")
+
 
         # Ottengo il numero del giorno della settimana
         day_of_the_week_number = uf.number_of_the_day(current_date_simulation)
 
-        # Se è cambiato l'anno riaggiorno tutte le capacità e ricopio le
-        # vecchie code
+        # Se è cambiato l'anno riaggiorno tutte le capacità e ricopio le vecchie code
         if current_year_simulation != previous_year_simulation:
             print("Nuovo anno!")
             new_hosp_list = uf.create_hospital_list(hosp_dict, current_year_simulation)

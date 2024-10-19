@@ -1,4 +1,6 @@
 import os
+import re
+
 import pandas as pd
 import joblib
 
@@ -174,7 +176,7 @@ def dict_mapping():
     joblib.dump(final_dict, '../DatiElaborati/mappingOspCom')
 
 # nei ricoveri abbiamo associazione tra paziente e nome del comune per cui dobbiamo estrarre i nomi dei comuni di residenza dei pazienti
-def dict_recod_residenza():
+def dict_map_id_ricovero_nome_id_comune():
     # Creo il dizionario di mapping tra id del record del paziente e l'id del comune di residenza.
     # Avrò {id_r:id_residenza}, avrò bisogno del file di mapping tra nome del comune e suo id.
     an = '/anagrafica.csv'
@@ -183,27 +185,21 @@ def dict_recod_residenza():
     df_2013 = pd.read_csv('../DatiOriginali/31-12-2012-29-12-2013'+an, usecols=[0,3], names=['id_record','nome_comune_residenza'])
 
     df_concat = pd.concat([df_2011, df_2012, df_2013], axis=0, join='outer', ignore_index=False)
+    df_concat.dropna(subset=['nome_comune_residenza'])
     df_concat['nome_comune_residenza'] = df_concat['nome_comune_residenza'].str.lower()
     # per rimuovere gli spazi dai nomi delle città
-    df_concat['nome_comune_residenza'] = "".join(df_concat['nome_comune_residenza'].str.split())
-
-    #print(len(set(df_concat['id_record'])))
-    #print(df_concat['nome_comune_residenza'])
+    df_concat['nome_comune_residenza'] = df_concat['nome_comune_residenza'].str.replace(r"\s+", "", regex=True)
     try: 
         comuni_ita = pd.read_csv('../DatiOriginali/Elenco-comuni-italiani.csv', usecols=[4,5])
     except:     
         read_file = pd.read_excel ('../DatiOriginali/Elenco-comuni-italiani.xls')
         read_file.to_csv ('../DatiOriginali/Elenco-comuni-italiani.csv', index = None, header=True)
         comuni_ita = pd.read_csv('../DatiOriginali/Elenco-comuni-italiani.csv', usecols=[4,5])
-    
     comuni_ita.columns = ['id_comune', 'nome_comune_residenza']
     comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.lower()
-    comuni_ita['nome_comune_residenza'] = "".join(comuni_ita['nome_comune_residenza'].str.split())
-    #print(comuni_ita['nome_comune_residenza'])
-    
+    comuni_ita.dropna(subset=['nome_comune_residenza'])
+    comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.replace(r"\s+", "", regex=True)
     res = pd.merge(df_concat, comuni_ita, on='nome_comune_residenza')
-    #print(res)
-    final_dict = {}
     final_dict = dict([(i,[a,b]) for i, a,b in zip(res.id_record, res.nome_comune_residenza,res.id_comune)])
     joblib.dump(final_dict, '../DatiOriginali/map_pat_idComRes')
     return final_dict

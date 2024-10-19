@@ -229,8 +229,6 @@ def load_policy_data():
     try:
         dict_distances = joblib.load('../DatiElaborati/distanzeComuniOspedali')
     except Exception:
-        path = '../DatiOriginali/distanzeComuniOspedali.csv'
-        name = 'distanzeComuniOspedali'
         dict_distances = parser_distanze.dict_comuni_hosp()
 
 
@@ -239,15 +237,13 @@ def load_policy_data():
 
 def load_residenze():
     """
-    Carica il dizionario di: id del record del paziente, comune di residenza del paziente ed
+    Carica il dizionario di: id del record del paziente, nome comune di residenza del paziente ed
     id del comune di residenza
     """
     try:
         dict_res = joblib.load('../Dati_Elaborati/map_pat_idComRes')
     except:
-        path = '../Consegna/Dati/general/'
-        dict_res = parser_distanze.dict_recod_residenza()
-    
+        dict_res = parser_distanze.dict_map_id_ricovero_nome_id_comune()
     return dict_res
 
 
