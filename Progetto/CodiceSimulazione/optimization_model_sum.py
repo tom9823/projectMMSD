@@ -5,6 +5,7 @@ import numpy as np
 from pyomo.opt import *
 import pyomo.environ as pyo
 from pyomo.environ import sqrt
+from scipy.constants import epsilon_0
 
 from Progetto.CodiceSimulazione.objects_classes import OptimizerModelType
 
@@ -40,7 +41,8 @@ def obj_expression_norm_1(m):
     return pyo.summation(m.delta)
 
 def obj_expression_norm_2(m):
-    return sqrt(sum(m.delta[p] ** 2 for p in m.P))
+    epsilon = 1e-8
+    return sqrt(sum(m.delta[p] ** 2 for p in m.P) + epsilon)
 
 def obj_expression_norm_inf(m):
     return max(m.delta)
