@@ -23,12 +23,10 @@ def big_delta_greater_than_delta(m, p):
 def create_model(data, solver, time_limit):
     model = pyo.AbstractModel()
     opt = solvers.SolverFactory(solver)
-    if solver == 'cplex':
-      opt.options['timelimit'] = time_limit
-    elif solver == 'glpk':         
-      opt.options['tmlim'] = time_limit
-    elif solver == 'gurobi':           
-      opt.options['TimeLimit'] = time_limit
+    if solver == 'cplex': opt.options['timelimit'] = time_limit
+    elif solver == 'glpk': opt.options['tmlim'] = time_limit
+    elif solver == 'gurobi': opt.options['TimeLimit'] = time_limit
+    elif solver == 'scip': opt.options['TimeLimit'] = time_limit
     # Parametri
     model.P = pyo.Set(within=pyo.NonNegativeIntegers)
     model.H = pyo.Set(within=pyo.NonNegativeIntegers)

@@ -69,7 +69,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # flag di blocco del riassegnamento greedy. Mettere False per usare l'ottimizzatore
     is_optimizer_off = False
     # quale modello utilizzare per l'ottimizzatore.
-    optimizer_model_type = oc.OptimizerModelType.NORM_INF
+    optimizer_model_type = oc.OptimizerModelType.NORM_2
     #  Flag per rimuovere le risorse solo una volta. Mettere a False se l'ottimizzatore è attivo
     flg_alt_remove = False
     
@@ -362,7 +362,7 @@ if __name__ == '__main__':
     # stesso dizionario di dict_mapping ma con chiave valore invertito (inverso di quello sopra)
     dict_mapping_com_hospital = {v: k for k, v in dict_mapping_hospital_com.items()}
     #Solver del modello di ottimizzazione
-    solver = "glpk"
+    solver = "ipopt"
     #Tempo in secondi a disposizione del solver
     time_limit = 10
     # dizionario per la residenza del paziente
