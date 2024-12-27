@@ -1,3 +1,5 @@
+import time
+
 import pandas as pd
 import optimization_model_sum as oms
 import optimization_model_delta as omd
@@ -136,6 +138,7 @@ def create_data(l, p, H, m, d, gamma):
 def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list,
                           closing_hosp_id_list, closing_spec_list, hosp_list, dict_mapping,
                           dict_distances, dict_map_residenza, map_com_hosp, solver, time_limit, optimizer_model_type):
+    start_time = time.time()
     new_list_hosp = []
 
     # Prendo una finestra di dataframe
@@ -208,4 +211,4 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
                 if t[0] in hospitalization_day_to_reassign_dataframe.index:
                     hospitalization_day_to_reassign_dataframe.at[t[0], 'codice_struttura_erogante'] = '0' + str(t[1])
 
-    return hospitalization_day_to_reassign_dataframe_list
+    return hospitalization_day_to_reassign_dataframe_list, time.time() - start_time

@@ -44,9 +44,6 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     gb = hospitalization_dataframe.groupby('data_ricovero')
     hospitalization_day_list = [gb.get_group(x) for x in gb.groups]
 
-    # lista di prova con solo 3 giorni nei 3 anni di riferimento
-    #hospitalization_day_list = [hospitalization_day_list[0], hospitalization_day_list[int(len(hospitalization_day_list)/2)], hospitalization_day_list[len(hospitalization_day_list)-2]]
-    
     # Mi salvo il primo anno che incontro
     first_date = hospitalization_day_list[0]['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
     previous_year_simulation = pd.to_datetime(first_date).year
@@ -93,28 +90,14 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     # Inizio della simulazione
     start_time_simulation = time.time()
     print("INIZIO SIMULAZIONE", start_time_simulation)
-    for i, df in enumerate(hospitalization_day_list):
-        if df.empty:
-            print(f"Il DataFrame vuoto si trova all'indice {i}")
     for hospitalization_day_dataframe in hospitalization_day_list:
         queue_info = []
         list_anticipated_patients = []
         print("Giorno: "+ str(simulation_day_index))
-        # Controllo se è cambiato l'anno
-        if not hospitalization_day_dataframe.empty:
-            # se il dataframe di ricovero giornaliero non è vuoto significa che sono ancora nell'anno precedente
-            current_date_simulation = hospitalization_day_dataframe['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
-            current_year_simulation = pd.to_datetime(current_date_simulation).year
-            first_date = current_date_simulation
-        else:
-            #se il dataframe è vuoto significa che l'anno è cambiato per cui incremento di un giorno la data
-            first_date = datetime.datetime.strptime(str(first_date), '%Y-%m-%simulation_day_index')
-            tmp_day = first_date + datetime.timedelta(days=1)
-            current_date_simulation = tmp_day.strftime("%Y-%m-%d")
-            current_year_simulation = pd.to_datetime(current_date_simulation).year
-            first_date = current_date_simulation
-        print(f"current_date_simulation: {current_date_simulation}")
 
+        current_date_simulation = hospitalization_day_dataframe['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
+        current_year_simulation = pd.to_datetime(current_date_simulation).year
+        print(f"current_date_simulation: {current_date_simulation}")
 
         # Ottengo il numero del giorno della settimana
         day_of_the_week_number = uf.number_of_the_day(current_date_simulation)
@@ -134,10 +117,11 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                 upper_threshold_simulation_day_index = len(hospitalization_day_list)
             print(f'upper_threshold_simulation_day_index: {upper_threshold_simulation_day_index}')
-            new_anticipated_days = rh.optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list, resources_to_remove[0],
+            new_anticipated_days, time_optimization = rh.optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list, resources_to_remove[0],
                                                             resources_to_remove[1], hosp_list, policy_resources[0],
                                                             policy_resources[1], policy_resources[2],
                                                             policy_resources[3], solver, time_limit, optimizer_model_type)
+            print(f'Ottimizzazione durata: {time_optimization} secondi')
             hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
 
         # Controllo se c'è da rimuovere delle risorse. La rimozione avviene o se si è superata la data passata
@@ -155,10 +139,11 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 upper_threshold_simulation_day_index = simulation_day_index + remaining_days_to_sunday # remaining_days_to_sunday sta per i giorni mancanti alla prossima domenica
                 if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                     upper_threshold_simulation_day_index = len(hospitalization_day_list)
-                new_anticipated_days = rh.optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list, resources_to_remove[0],
+                new_anticipated_days, time_optimization = rh.optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list, resources_to_remove[0],
                                                                 resources_to_remove[1], hosp_list, policy_resources[0],
                                                                 policy_resources[1], policy_resources[2],
                                                                 policy_resources[3], solver, time_limit, optimizer_model_type)
+                print(f"Ottimizzazione durata: {time_optimization} secondi")
                 hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
         # Decremento i giorni di degenza dei pazienti nelle varie specialità h, poi levo i pazienti a 0 giorni di
         # degenza.
@@ -315,10 +300,11 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             upper_threshold_simulation_day_index = d1 + 8 # 8 indica l'intera settimana. !IMPORTANTE non prendere meno di una settimana
             if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                 upper_threshold_simulation_day_index = len(hospitalization_day_list)
-            new_anticipated_days = rh.optimization_reassing(d1, upper_threshold_simulation_day_index, hospitalization_day_list, resources_to_remove[0],
+            new_anticipated_days, time_optimization = rh.optimization_reassing(d1, upper_threshold_simulation_day_index, hospitalization_day_list, resources_to_remove[0],
                                                             resources_to_remove[1], hosp_list, policy_resources[0],
                                                             policy_resources[1], policy_resources[2],
                                                             policy_resources[3], solver, time_limit, optimizer_model_type)
+            print(f"Ottimizzazione durata: {time_optimization} secondi")
             hospitalization_day_list[d1:upper_threshold_simulation_day_index] = new_anticipated_days
 
         # Salvo le info dei pazienti ricoverati in anticipo
