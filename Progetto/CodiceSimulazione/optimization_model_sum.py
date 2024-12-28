@@ -38,11 +38,14 @@ d = distanze con i nuovi ospedali
 def obj_expression_norm_1(m):
     return pyo.summation(m.delta)
 
+
 def obj_expression_norm_2(m):
-    return pyo.sqrt(sum(m.delta[p] ** 2 for p in m.P))
+    return pyo.summation(m.q)
+
 
 def obj_expression_norm_inf(m):
     return max(m.delta)
+
 
 # Vincoli
 def patient_in_only_one_hospital(m, p):
@@ -54,7 +57,10 @@ def patients_redistribution(m, h):
 
 
 def discomfort_calculation(m, p, h):
-    return m.delta[p] >= (m.d[p, h] - m.m[p]) * m.x[p, h]
+    return m.delta[p] >= max(0,(m.d[p, h] - m.m[p])) * m.x[p, h]
+
+def discomfort_calculation_q(m, p, h):
+    return m.q[p] >= (max((m.d[p, h] - m.m[p]),0)**2) * m.x[p, h]
 
 def dont_exceed_maximum_discomfort(m, p):
     return max(m.delta) >= m.delta[p]
@@ -79,19 +85,24 @@ def create_model(data, solver, time_limit, optimizer_model_type):
     model.d = pyo.Param(model.P, model.H)
     # Variabili
     model.x = pyo.Var(model.P, model.H, domain=pyo.Binary)
-    model.delta = pyo.Var(model.P, domain=pyo.NonNegativeReals)
-    #Funzione obiettivo
+    if optimizer_model_type == OptimizerModelType.NORM_2:
+        model.q = pyo.Var(model.P, domain=pyo.NonNegativeReals)
+    else:
+        model.delta = pyo.Var(model.P, domain=pyo.NonNegativeReals)
+    # Funzione obiettivo
     if optimizer_model_type == OptimizerModelType.NORM_1:
         model.OBJ = pyo.Objective(rule=obj_expression_norm_1)
     elif optimizer_model_type == OptimizerModelType.NORM_2:
         model.OBJ = pyo.Objective(rule=obj_expression_norm_2)
     elif optimizer_model_type == OptimizerModelType.NORM_INF:
         model.OBJ = pyo.Objective(rule=obj_expression_norm_inf)
-    #Vincoli
+    # Vincoli
     model.PatientInOnlyOneHospital = pyo.Constraint(model.P, rule=patient_in_only_one_hospital)
     model.PatientsRedistribution = pyo.Constraint(model.H, rule=patients_redistribution)
-    model.DiscomfortCalculation = pyo.Constraint(model.P, model.H, rule=discomfort_calculation)
-
+    if optimizer_model_type == OptimizerModelType.NORM_2:
+        model.DiscomfortCalculationQ = pyo.Constraint(model.P, model.H, rule=discomfort_calculation_q)
+    else:
+        model.DiscomfortCalculation = pyo.Constraint(model.P, model.H, rule=discomfort_calculation)
     if optimizer_model_type == OptimizerModelType.NORM_INF:
         model.DontExceedMaximumDiscomfort = pyo.Constraint(model.P, rule=dont_exceed_maximum_discomfort)
     model_instance = model.create_instance(data)
