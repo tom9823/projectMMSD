@@ -1,0 +1,4 @@
+domande/note:
+- aggiunto max nel parametro a
+- spurious days è sempre a zero
+- norma due aggiunta e controolare vincoli per le altre funzioni obiettivo
