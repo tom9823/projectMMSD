@@ -35,12 +35,12 @@ d = distanze con i nuovi ospedali
 
 
 # Variabile obbiettivo
-def obj_expression_norm_1(m):
-    return pyo.summation(m.delta)
+def obj_expression_norm_1(model):
+    return pyo.summation(model.delta)
 
 
-def obj_expression_norm_2(m):
-    return pyo.sqrt(sum(m.delta[p] ** 2 for p in m.P))
+def obj_expression_norm_2(model):
+    return pyo.sqrt(sum(model.delta[p] ** 2 for p in model.P))
 
 
 def obj_expression_norm_inf(model):
@@ -100,7 +100,7 @@ def create_model(data, solver, time_limit, optimizer_model_type):
     model.PatientsRedistribution = pyo.Constraint(model.H, rule=patients_redistribution)
     model.DiscomfortCalculation = pyo.Constraint(model.P, model.H, rule=discomfort_calculation)
     if optimizer_model_type == OptimizerModelType.NORM_INF:
-        model.DiscomfortCalculation = pyo.Constraint(model.P, rule=dont_exceed_maximum_discomfort)
+        model.DontExceedMaximumDiscomfort = pyo.Constraint(model.P, rule=dont_exceed_maximum_discomfort)
     model.OBJ = pyo.Objective(rule=obj_expression_norm_inf)
     model_instance = model.create_instance(data)
 
