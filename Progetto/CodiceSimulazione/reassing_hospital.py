@@ -2,7 +2,6 @@ import time
 
 import pandas as pd
 import optimization_model_sum as oms
-import optimization_model_delta as omd
 import utility_functions as uf
 from pyomo.opt import *
 
