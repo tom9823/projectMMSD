@@ -215,7 +215,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             hospitalization_record_recovery_date = hospitalization_record['data_ricovero'].strftime("%Y-%m-%d")
 
             # Creo l'oggetto paziente con tutte le info
-            current_hospitalization_patient_object = oc.Patient(index, hospitalization_record_rest_time,
+            current_hospitalization_patient_object = oc.Patient(hospitalization_record_id_ricovero, hospitalization_record_rest_time,
                                                                 hospitalization_record_recovery_date,
                                                                 hospitalization_record_id_hosp,
                                                                 hospitalization_record_id_spec)
