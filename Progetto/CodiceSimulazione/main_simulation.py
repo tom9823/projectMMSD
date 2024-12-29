@@ -168,7 +168,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 p.rest_time -= 1
             h.rest_queue = [p for p in h.rest_queue if p.rest_time > 0]
 
-        # Controllo se posso ricoverare i pazienti nella lista di attesa
+        # Controllo se posso ricoverare i pazienti nelle lista di attesa della specialità
         for h in hosp_list:
             for p in h.waiting_queue:
                 # controllo se non sforo il numero di letti massimo della specialità
@@ -184,7 +184,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                         )
                         p.patient_true_day_recovery = current_date_simulation
                         queue_info.append([p, h])
-        # Controllo se posso ricoverare i nuovi pazienti
+        # Controllo se posso ricoverare i nuovi pazienti che non sono nelle liste di attesa della specialità
         for index, hospitalization_record in hospitalization_day_dataframe.iterrows():
             # Leggo e salvo le info del paziente
             hospitalization_record_id_hosp = hospitalization_record.loc['codice_struttura_erogante']
@@ -194,6 +194,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             # Controllo se l'ospedale o la specialità è stata eliminata, nel caso li aggiorno con la policy
             threshold_date_to_close_speciality = datetime.datetime.strptime(str(resources_to_remove[2][0]),
                                                                             "%Y-%m-%d").date()
+            # ASSEGNAMENTO GREEDY
             # Rimuovo le specialità se si è superata la data e se non si usa l'ottimizzazione settimanale(is_optimizer_off == True)
             if is_optimizer_off and datetime.datetime.strptime(current_date_simulation,
                                                                "%Y-%m-%d").date() >= threshold_date_to_close_speciality:
@@ -270,7 +271,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                 counter_current_day_patients_recovered + 1)
                     hospitalization_record_hospital_specialty_object.rest_queue.append(current_hospitalization_patient_object)
 
-        # ANTICIPO
+        # ANTICIPO PAZIENTI
         # Controllo se posso anticipare l'ingresso di pazienti nei prossimi
         # remaining_days_to_sunday giorni se ho superato 'spurious_days' giorni
         # ATTENZIONE! Fare attenzione se si usa insieme all'ottimizzatore settimanale
