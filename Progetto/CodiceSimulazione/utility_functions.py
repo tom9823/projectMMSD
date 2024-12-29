@@ -45,7 +45,7 @@ def number_of_the_day(date_pat):
     Trova il numero della settimana.
 
     Ricava il numero del giorno della settimana in base alla data di ricovero
-    del paziente (Lunedì=0, martedì=1, ecc...).
+    del paziente (lunedì=0, martedì=1, ecc...).
 
     Parameters
     ----------
@@ -64,7 +64,7 @@ def number_of_the_day(date_pat):
     return int(day)
 
 
-def create_hospital_list(hosp_dict, year):
+def create_hospital_specialty_list_from_year(hosp_dict, year):
     """
     Creo una nuova lista di oggetti ospedale.
 
