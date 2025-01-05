@@ -52,7 +52,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     previous_year_simulation = pd.to_datetime(first_date).year
 
     # Creo la lista degli oggetti ospedale specialità
-    hosp_list = uf.create_hospital_specialty_list_from_year(hosp_dict, previous_year_simulation)
+    hosp_spec_list_object = uf.create_hospital_specialty_list_from_year(hosp_dict, previous_year_simulation)
 
     print("Totale giorni: " + str(len(hospitalization_day_list)))
 
@@ -74,7 +74,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     flg_alt_remove = False
 
     # Creo i file di log
-    save_info.create_day_log(hospitalization_day_list, hosp_list, spurious_days, name)
+    save_info.create_day_log(hospitalization_day_list, hosp_spec_list_object, spurious_days, name)
 
     save_info.create_queue_info(name)
 
@@ -95,7 +95,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     print("INIZIO SIMULAZIONE", start_time_simulation)
     for hospitalization_day_dataframe in hospitalization_day_list:
         queue_info = []
-        #lista che contiene gli oggetti Patient che vengono anticipati
+        # lista che contiene gli oggetti Patient che vengono anticipati
         list_anticipated_patients = []
         print("Giorno: " + str(simulation_day_index))
 
@@ -110,10 +110,10 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
         if current_year_simulation != previous_year_simulation:
             print("Nuovo anno per cui rimuovo le risorse")
             new_hosp_list = uf.create_hospital_specialty_list_from_year(hosp_dict, current_year_simulation)
-            hosp_list = uf.update_hospital_capacity(hosp_list, new_hosp_list)
-            print(f"Prima della rimozione risorse: {len(hosp_list)} specialità")
-            hosp_list = rr.remove_resources(hosp_list, resources_to_remove)
-            print(f"Dopo la rimozione risorse: {len(hosp_list)} specialità")
+            hosp_spec_list_object = uf.update_hospital_capacity(hosp_spec_list_object, new_hosp_list)
+            print(f"Prima della rimozione risorse: {len(hosp_spec_list_object)} specialità")
+            hosp_spec_list_object = rr.remove_resources(hosp_spec_list_object, resources_to_remove)
+            print(f"Dopo la rimozione risorse: {len(hosp_spec_list_object)} specialità")
             previous_year_simulation = current_year_simulation
             # Riassegno i pazienti che non hanno l'ospedale
             # remaining_days_to_sunday sta per i giorni mancanti alla prossima domenica
@@ -126,10 +126,11 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                upper_threshold_simulation_day_index,
                                                                                hospitalization_day_list,
                                                                                resources_to_remove[0],
-                                                                               resources_to_remove[1], hosp_list,
+                                                                               resources_to_remove[1],
+                                                                               hosp_spec_list_object,
                                                                                policy_resources[0],
                                                                                policy_resources[1], policy_resources[2],
-                                                                               policy_resources[3], solver, time_limit,
+                                                                               solver, time_limit,
                                                                                optimizer_model_type)
             print(f'Ottimizzazione durata: {time_optimization} secondi')
             hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
@@ -140,9 +141,9 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 
         if (current_date_simulation == str(resources_to_remove[2][0])) or (not is_optimizer_off):
             if not flg_alt_remove:
-                print(f"Prima della rimozione risorse: {len(hosp_list)} specialità")
-                hosp_list = rr.remove_resources(hosp_list, resources_to_remove)
-                print(f"Dopo la rimozione risorse: {len(hosp_list)} specialità")
+                print(f"Prima della rimozione risorse: {len(hosp_spec_list_object)} specialità")
+                hosp_spec_list_object = rr.remove_resources(hosp_spec_list_object, resources_to_remove)
+                print(f"Dopo la rimozione risorse: {len(hosp_spec_list_object)} specialità")
                 flg_alt_remove = True
                 # Riassegno i pazienti che non hanno l'ospedale
                 remaining_days_to_sunday = 7 - day_of_the_week_number
@@ -153,23 +154,24 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                    upper_threshold_simulation_day_index,
                                                                                    hospitalization_day_list,
                                                                                    resources_to_remove[0],
-                                                                                   resources_to_remove[1], hosp_list,
+                                                                                   resources_to_remove[1],
+                                                                                   hosp_spec_list_object,
                                                                                    policy_resources[0],
                                                                                    policy_resources[1],
-                                                                                   policy_resources[2],
-                                                                                   policy_resources[3], solver,
+                                                                                   policy_resources[2], solver,
                                                                                    time_limit, optimizer_model_type)
                 print(f"Ottimizzazione durata: {time_optimization} secondi")
-                hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
+                hospitalization_day_list[
+                simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
         # Decremento i giorni di degenza dei pazienti nelle varie specialità h, poi levo i pazienti a 0 giorni di
         # degenza.
-        for h in hosp_list:
+        for h in hosp_spec_list_object:
             for p in h.rest_queue:
                 p.rest_time -= 1
             h.rest_queue = [p for p in h.rest_queue if p.rest_time > 0]
 
         # Controllo se posso ricoverare i pazienti nelle lista di attesa della specialità
-        for h in hosp_list:
+        for h in hosp_spec_list_object:
             for p in h.waiting_queue:
                 # controllo se non sforo il numero di letti massimo della specialità
                 if len(h.rest_queue) < int(h.capacity[7]):
@@ -202,35 +204,38 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 hospitalization_record_id_hosp = rr.removed_id_check(resources_to_remove,
                                                                      hospitalization_record_id_hosp,
                                                                      hospitalization_record_id_spec,
-                                                                     hosp_list, lista_comuni_mancanti, policy_resources,
+                                                                     hosp_spec_list_object, lista_comuni_mancanti,
+                                                                     policy_resources,
                                                                      hospitalization_record_id_ricovero)
 
             # Recupero l'oggetto ospedale del paziente
-            hospitalization_record_hospital_specialty_object = uf.get_hospitalization_hospital(hosp_list,
-                                                                                     hospitalization_record_id_hosp,
-                                                                                     hospitalization_record_id_spec)
+            hospitalization_record_hospital_specialty_object = uf.get_hospitalization_hospital(hosp_spec_list_object,
+                                                                                               hospitalization_record_id_hosp,
+                                                                                               hospitalization_record_id_spec)
 
             hospitalization_record_rest_time = int(hospitalization_record.loc['gg_degenza'])
 
             hospitalization_record_recovery_date = hospitalization_record['data_ricovero'].strftime("%Y-%m-%d")
 
             # Creo l'oggetto paziente con tutte le info
-            current_hospitalization_patient_object = oc.Patient(hospitalization_record_id_ricovero, hospitalization_record_rest_time,
+            current_hospitalization_patient_object = oc.Patient(hospitalization_record_id_ricovero,
+                                                                hospitalization_record_rest_time,
                                                                 hospitalization_record_recovery_date,
                                                                 hospitalization_record_id_hosp,
                                                                 hospitalization_record_id_spec)
 
             # ottengo le due capacità
             hosp_spec_max_beds_capacity = int(hospitalization_record_hospital_specialty_object.capacity[7])
-            hosp_spec_day_capacity = int(hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
+            hosp_spec_day_capacity = int(
+                hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
             # ci sono casi in cui la capacità giornaliera è 0, non li considero
             if hosp_spec_day_capacity != 0:
                 # diminuisco di una percentuale arrotondando per difetto con
                 # vincolo sulla capacità
                 if hosp_spec_day_capacity > capacity_threshold:
                     hosp_spec_day_capacity = int(hosp_spec_day_capacity -
-                                            (hosp_spec_day_capacity * daily_percentage_reduction_capacity)
-                                            )
+                                                 (hosp_spec_day_capacity * daily_percentage_reduction_capacity)
+                                                 )
                 # se la capacità diventa nulla la metto a 1
                 if hosp_spec_day_capacity == 0:
                     hosp_spec_day_capacity = 1
@@ -244,32 +249,42 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 # DA RIVEDERE CODICE UGUALE
                 if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered >= hosp_spec_day_capacity:
                     current_hospitalization_patient_object.queue_motivation = 'all_full'
-                    hospitalization_record_hospital_specialty_object.counter_max_queue = (hospitalization_record_hospital_specialty_object.
-                                                                                counter_max_queue + 1)
-                    current_hospitalization_patient_object.counter_queue = (hospitalization_record_hospital_specialty_object.
-                                                                            counter_max_queue)
-                    hospitalization_record_hospital_specialty_object.waiting_queue.append(current_hospitalization_patient_object)
+                    hospitalization_record_hospital_specialty_object.counter_max_queue = (
+                            hospitalization_record_hospital_specialty_object.
+                            counter_max_queue + 1)
+                    current_hospitalization_patient_object.counter_queue = (
+                        hospitalization_record_hospital_specialty_object.
+                        counter_max_queue)
+                    hospitalization_record_hospital_specialty_object.waiting_queue.append(
+                        current_hospitalization_patient_object)
                 else:
                     current_hospitalization_patient_object.queue_motivation = 'hospital_speciality_beds_full'
-                    hospitalization_record_hospital_specialty_object.counter_max_queue = (hospitalization_record_hospital_specialty_object.
-                                                                                counter_max_queue + 1)
-                    current_hospitalization_patient_object.counter_queue = (hospitalization_record_hospital_specialty_object.
-                                                                            counter_max_queue)
-                    hospitalization_record_hospital_specialty_object.waiting_queue.append(current_hospitalization_patient_object)
+                    hospitalization_record_hospital_specialty_object.counter_max_queue = (
+                            hospitalization_record_hospital_specialty_object.
+                            counter_max_queue + 1)
+                    current_hospitalization_patient_object.counter_queue = (
+                        hospitalization_record_hospital_specialty_object.
+                        counter_max_queue)
+                    hospitalization_record_hospital_specialty_object.waiting_queue.append(
+                        current_hospitalization_patient_object)
             else:
                 # Controllo se si è sforata la capacità giornaliera massima
                 if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered >= hosp_spec_day_capacity:
                     current_hospitalization_patient_object.queue_motivation = 'hospital_speciality_capacity_day_full'
-                    hospitalization_record_hospital_specialty_object.counter_day_queue = (hospitalization_record_hospital_specialty_object.
-                                                                                counter_day_queue + 1)
-                    current_hospitalization_patient_object.counter_queue = (hospitalization_record_hospital_specialty_object.
-                                                                            counter_day_queue)
-                    hospitalization_record_hospital_specialty_object.waiting_queue.append(current_hospitalization_patient_object)
+                    hospitalization_record_hospital_specialty_object.counter_day_queue = (
+                            hospitalization_record_hospital_specialty_object.
+                            counter_day_queue + 1)
+                    current_hospitalization_patient_object.counter_queue = (
+                        hospitalization_record_hospital_specialty_object.
+                        counter_day_queue)
+                    hospitalization_record_hospital_specialty_object.waiting_queue.append(
+                        current_hospitalization_patient_object)
                 else:
                     hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered = (
-                                hospitalization_record_hospital_specialty_object.
-                                counter_current_day_patients_recovered + 1)
-                    hospitalization_record_hospital_specialty_object.rest_queue.append(current_hospitalization_patient_object)
+                            hospitalization_record_hospital_specialty_object.
+                            counter_current_day_patients_recovered + 1)
+                    hospitalization_record_hospital_specialty_object.rest_queue.append(
+                        current_hospitalization_patient_object)
 
         # ANTICIPO PAZIENTI
         # Controllo se posso anticipare l'ingresso di pazienti nei prossimi
@@ -285,27 +300,29 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             # cicla dall'indomani(simulation_day_index + 1) fino al giorno forward days
             for next_day in anticipated_days:
                 patient_removed = []
-                #ciclo per tutti i ricoveri di next_day
+                # ciclo per tutti i ricoveri di next_day
                 for id_hospitalization, hospitalization_record in next_day.iterrows():
                     hospitalization_record_id_hosp = hospitalization_record.loc['codice_struttura_erogante']
                     hospitalization_record_id_spec = hospitalization_record.loc['COD_BRANCA']
-                    #individua l'oggetto ospedale e specialità del paziente
-                    hospitalization_record_hospital_specialty_object = uf.get_hospitalization_hospital(hosp_list,
-                                                                                             hospitalization_record_id_hosp,
-                                                                                             hospitalization_record_id_spec)
+                    # individua l'oggetto ospedale e specialità del paziente
+                    hospitalization_record_hospital_specialty_object = uf.get_hospitalization_hospital(
+                        hosp_spec_list_object,
+                        hospitalization_record_id_hosp,
+                        hospitalization_record_id_spec)
                     if hospitalization_record_hospital_specialty_object != 'None':
 
                         if len(hospitalization_record_hospital_specialty_object.rest_queue) < hosp_spec_max_beds_capacity:
-                            hosp_spec_day_capacity = int(hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
+                            hosp_spec_day_capacity = int(
+                                hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
                             if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered < hosp_spec_day_capacity:
-
-                                #ricovero un nuovo paziente
+                                # ricovero un nuovo paziente
                                 hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered = (
-                                            hospitalization_record_hospital_specialty_object.
-                                            counter_current_day_patients_recovered + 1)
+                                        hospitalization_record_hospital_specialty_object.
+                                        counter_current_day_patients_recovered + 1)
 
                                 hospitalization_record_rest_time = int(hospitalization_record.loc['gg_degenza'])
-                                hospitalization_record_recovery_date = (str(hospitalization_record['data_ricovero']).split(" ")[0])
+                                hospitalization_record_recovery_date = (
+                                    str(hospitalization_record['data_ricovero']).split(" ")[0])
                                 current_hospitalization_patient_object = oc.Patient(id_hospitalization,
                                                                                     hospitalization_record_rest_time,
                                                                                     hospitalization_record_recovery_date,
@@ -316,9 +333,9 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                 hospitalization_record_hospital_specialty_object.rest_queue.append(
                                     current_hospitalization_patient_object)
                                 list_anticipated_patients.append(current_hospitalization_patient_object)
-                                #patient_removed contiene gli indici dei ricoveri anticipati
+                                # patient_removed contiene gli indici dei ricoveri anticipati
                                 patient_removed.append(id_hospitalization)
-                #rimuovo dal dataset nextday i pazienti anticipati
+                # rimuovo dal dataset nextday i pazienti anticipati
                 for patient in patient_removed:
                     next_day = next_day.drop(patient)
                 tmp_ant_day.append(next_day)
@@ -338,10 +355,10 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
             new_anticipated_days, time_optimization = rh.optimization_reassing(d1, upper_threshold_simulation_day_index,
                                                                                hospitalization_day_list,
                                                                                resources_to_remove[0],
-                                                                               resources_to_remove[1], hosp_list,
+                                                                               resources_to_remove[1],
+                                                                               hosp_spec_list_object,
                                                                                policy_resources[0],
-                                                                               policy_resources[1], policy_resources[2],
-                                                                               policy_resources[3], solver, time_limit,
+                                                                               policy_resources[1], policy_resources[2], solver, time_limit,
                                                                                optimizer_model_type)
             print(f"Ottimizzazione durata: {time_optimization} secondi")
             hospitalization_day_list[d1:upper_threshold_simulation_day_index] = new_anticipated_days
@@ -350,13 +367,13 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
         save_info.anticipated_patient(list_anticipated_patients, name)
 
         # Salvo le info della giornata degli ospedali
-        save_info.save_day_info(hosp_list, simulation_day_index, day_of_the_week_number, name)
+        save_info.save_day_info(hosp_spec_list_object, simulation_day_index, day_of_the_week_number, name)
 
         # Salvo le info della situazione code
         save_info.save_queue_info(queue_info, day_of_the_week_number, name)
 
         # Resetto i counter di tutti gli ospedali
-        for h in hosp_list:
+        for h in hosp_spec_list_object:
             h.counter_current_day_patients_recovered = 0
             h.counter_day_queue = 0
             h.counter_max_queue = 0
@@ -369,6 +386,28 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 
     end = time.time()
     print(f"Durata di esecuzione: {(end - start) / 60} minuti; {(end - start)} secondi.")
+
+
+def calculate_distance(hospitalization_row, dict_mapping_hospital_com, dict_distances):
+    id_hosp = hospitalization_row['codice_struttura_erogante']
+    id_comune = hospitalization_row['codice_comune_residenza']
+    if id_comune == None:
+        # id_com_pat = ['cuneo', 4078]
+        return 0
+    id_com_hosp = dict_mapping_hospital_com.get(int(id_hosp), None)
+    if id_com_hosp == None:
+        # id_com_hosp = '4078'
+        return 0
+    tmp = dict_distances.get(str(id_comune), None)
+    if tmp == None:
+        dis = 1
+    else:
+        dis = tmp.get(int(id_com_hosp), None)
+    return int(dis)
+
+def calculate_distance_wrapper(row):
+    return calculate_distance(row, dict_mapping_hospital_com, dict_distances_com)
+
 
 
 if __name__ == '__main__':
@@ -391,10 +430,35 @@ if __name__ == '__main__':
     # Tempo in secondi a disposizione del solver
     time_limit = 10
     # dizionario per la residenza del paziente
-    dict_map_residenza = parser_data.load_residenze()
+    dict_id_hospitalization_array_nome_and_id_comune = parser_data.load_residenze()
+    # aggiungo il codice comune residenza ed il nome del comune del paziente ricoverato al record del ricovero
+    patients = patients.join(pd.DataFrame.from_dict(dict_id_hospitalization_array_nome_and_id_comune, orient='index',
+                                                    columns=['nome_comune_residenza', 'codice_comune_residenza']))
+    patients['codice_comune_residenza'] = (
+        patients['codice_comune_residenza']
+        .astype('Int64')  # o 'Int32', se preferisci
+    )
+    patients['join_residenza_match'] = patients['nome_comune_residenza'].notna() | patients[
+        'codice_comune_residenza'].notna()
+    patients.loc[patients['join_residenza_match'] == False, 'codice_comune_residenza'] = (
+        patients.loc[patients['join_residenza_match'] == False]
+        .apply(lambda row: int(dict_mapping_hospital_com.get(int(row['codice_struttura_erogante'])), 0)
+        if pd.notnull(row['codice_struttura_erogante'])
+        else 0, axis=1)
+    )
+    # inizializzo la colonna codice_struttura_erogante_nuova
+    patients['codice_struttura_erogante_nuova'] = ''
+    patients['distanza_vecchio_ospedale'] = 0
 
+    mask = patients['join_residenza_match'] == True
+    patients.loc[mask, 'distanza_vecchio_ospedale'] = (
+        patients.loc[mask].apply(calculate_distance_wrapper, axis=1)
+    )
+
+    patients['distanza_nuovo_ospedale'] = 0
+    patients['discomfort'] = 0
     start_simulation(patients, hosp_dict, [hosp_id_list, hosp_spec_list, date], [dict_mapping_hospital_com,
                                                                                  dict_distances_com,
-                                                                                 dict_mapping_com_hospital,
-                                                                                 dict_map_residenza], solver,
+                                                                                 dict_mapping_com_hospital],
+                     solver,
                      time_limit, name)
