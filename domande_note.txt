@@ -1,4 +1,7 @@
 domande/note:
 - aggiunto max nel parametro a
 - spurious days è sempre a zero
-- norma due aggiunta e controolare vincoli per le altre funzioni obiettivo
+- norma due aggiunta e controllare vincoli per le altre funzioni obiettivo
+- distanze con altre ospedali sempre zero se manca comune paziente
+- che mai 8 opzioni(2 per il greedy e 6 per i modelli)?
+- spurious_days viee usato solo per anticipo, è corretto?
