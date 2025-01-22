@@ -79,7 +79,7 @@ def initialize_hospitals(risorse):
     return final_dict
 
 
-def __codicespec_risorse(s):
+def __risorse_idspec_parser(s):
     tmp_id_spec = str(s).split("_")[1]
     if tmp_id_spec.startswith("0"):
         id_spec = tmp_id_spec.split("0")[1]
@@ -87,46 +87,15 @@ def __codicespec_risorse(s):
         id_spec = tmp_id_spec
     return int(id_spec)
 
-
 def __codicespec_ricoveri(s):
     return int(s)
 
-
-def __parser_idspec(df):
-    if 'codici_specialita' in df.columns:
-        tmp = df['codici_specialita'].apply(__codicespec_risorse)
-        df['codici_specialita'] = tmp
-    else:
-        if 'COD_BRANCA' in df.columns:
-            df['COD_BRANCA'] = df['COD_BRANCA'].apply(__codicespec_ricoveri)
-        else:
-            raise Exception('Il nome della colonna dei codici delle specialità'
-                            ' non è stato trovato')
-    return df
-
-
-def __risorse_parser(code):
+def __risorse_codice_ospedale_parser(code):
     return str(code).split("_")[1]
 
-
-def __ricoveri_parser(code):
+def __hospitalization_codice_struttura_erogante_parser(code):
     h, t = str(code).split("-")
     return h + t
-
-
-def __parser_idhosp(df):
-    if 'codici_ospedale' in df.columns:
-        tmp = df['codici_ospedale'].apply(__risorse_parser)
-        df['codici_ospedale'] = tmp
-    else:
-        if 'codice_struttura_erogante' in df.columns:
-            tmp = df['codice_struttura_erogante'].apply(__ricoveri_parser)
-            df['codice_struttura_erogante'] = tmp
-        else:
-            raise Exception('Il nome della colonna dei codici degli ospedali'
-                            ' non è stato trovato')
-    return df
-
 
 def __load():
     '''
@@ -135,34 +104,64 @@ def __load():
     -------
 
     '''
-    ricoveri = pd.read_csv("../DatiOriginali/ricoveri.csv",
-                           usecols=['anno', 'n_record', 'data_ricovero', 'gg_degenza',
-                                    'codice_struttura_erogante', 'COD_BRANCA'])
+    file_sdo_2011 = "../RawData/03-01-2011-01-01-2012/sdo.csv"
+    file_anagrafica_2011 = "../RawData/03-01-2011-01-01-2012/anagrafica.csv"
+    file_sdo_2012 = "../RawData/02-01-2012-30-12-2012/sdo.csv"
+    file_anagrafica_2012 = "../RawData/02-01-2012-30-12-2012/anagrafica.csv"
+    file_sdo_2013 = "../RawData/31-12-2012-29-12-2013/sdo.csv"
+    file_anagrafica_2013 = "../RawData/31-12-2012-29-12-2013/anagrafica.csv"
+    sdo_list = [file_sdo_2011, file_sdo_2012, file_sdo_2013]
+    anagrafica_list = [file_anagrafica_2011, file_anagrafica_2012, file_anagrafica_2013]
+    hospitalizations = None
+    for i in range(len(sdo_list)):
+        sdo_path = sdo_list[i]
+        anagrafica_path = anagrafica_list[i]
+        sdo_dataframe = pd.read_csv(sdo_path, usecols=[0, 1, 2, 3, 6, 10, 15, 25, 26, 27, 35, 37], header=0)
+        sdo_dataframe.columns = [
+            'anno',
+            'mese',
+            'giorno',
+            'id_ricovero',
+            'data_dimissione',
+            'data_ricovero',
+            'giorni_degenza',
+            'asl_territoriale',
+            'asl_erogante',
+            'codice_struttura_erogante',
+            'cod_branca_ammissione',
+            'cod_branca_dimissione'
+        ]
+        sdo_dataframe['match_cod_branca'] = sdo_dataframe['cod_branca_ammissione'] == sdo_dataframe['cod_branca_dimissione']
+        anagrafica_dataframe = pd.read_csv(anagrafica_path)
+        sdo_dataframe.set_index(sdo_dataframe.columns[3], inplace=True)
+        anagrafica_dataframe.set_index(anagrafica_dataframe.columns[0], inplace=True)
+        hospitalizations = pd.concat([hospitalizations, sdo_dataframe.merge(
+            anagrafica_dataframe,
+            left_index=True,
+            right_index=True
+        )], axis=0)
 
-    risorse = pd.read_csv("../DatiOriginali/specialtyCapacitySchedules.csv",
-                          usecols=['codici_ospedale', 'codici_specialita',
+    hospitalizations["data_ricovero"] = pd.to_datetime(hospitalizations["data_ricovero"])
+    hospitalizations.sort_values('data_ricovero', inplace=True)
+
+    hospitalizations['codice_struttura_erogante'] = hospitalizations['codice_struttura_erogante'].apply(
+        __hospitalization_codice_struttura_erogante_parser)
+
+    risorse = pd.read_csv("../RawData/specialtyCapacitySchedules.csv",
+                          usecols=['codice_struttura_erogante', 'codici_specialita',
                                    'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
                                    'FRIDAY', 'SATURDAY', 'SUNDAY',
                                    'capacita_max', 'year'])
-
-    ricoveri["data_ricovero"] = pd.to_datetime(ricoveri["data_ricovero"])
-    ricoveri.sort_values('data_ricovero', inplace=True)
-    ricoveri = ricoveri.reset_index(drop=True)
-    ricoveri = ricoveri.dropna()
-
-    ricoveri = __parser_idhosp(ricoveri)
-    ricoveri = __parser_idspec(ricoveri)
-
-    risorse = __parser_idhosp(risorse)
-    risorse = __parser_idspec(risorse)
+    risorse['codice_struttura_erogante'] = risorse['codice_struttura_erogante'].apply(__risorse_codice_ospedale_parser)
+    risorse['codici_specialita'] = risorse['codici_specialita'].apply(__risorse_idspec_parser)
 
     filename = '../DatiElaborati/risorse_simulazione'
     joblib.dump(risorse, filename)
     print("Creazione file ", filename)
     filename = '../DatiElaborati/ricoveri_simulazione'
-    joblib.dump(ricoveri, filename)
+    joblib.dump(hospitalizations, filename)
     print("Creazione file ", filename)
-    return risorse, ricoveri
+    return risorse, hospitalizations
 
 
 def load_data():
@@ -182,11 +181,7 @@ def load_data():
         pazienti.
 
     """
-    try:
-        risorse = joblib.load('../DatiElaborati/risorse_simulazione')
-        ricoveri = joblib.load('../DatiElaborati/ricoveri_simulazione')
-    except Exception:
-        risorse, ricoveri = __load()
+    risorse, ricoveri = __load()
 
     return risorse, ricoveri
 
@@ -231,7 +226,6 @@ def load_policy_data():
     except Exception:
         dict_distances = parser_distanze.dict_comuni_hosp()
 
-
     return dict_mapping, dict_distances
 
 
@@ -248,6 +242,6 @@ def load_residenze():
 
 
 if __name__ == '__main__':
-    #risorse, ricoveri = load_data()
-    #load_hosp_dict(risorse)
+    # risorse, ricoveri = load_data()
+    # load_hosp_dict(risorse)
     load_policy_data()
