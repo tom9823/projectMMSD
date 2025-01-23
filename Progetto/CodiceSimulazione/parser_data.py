@@ -87,13 +87,10 @@ def __risorse_idspec_parser(s):
         id_spec = tmp_id_spec
     return int(id_spec)
 
-def __codicespec_ricoveri(s):
-    return int(s)
-
 def __risorse_codice_ospedale_parser(code):
     return str(code).split("_")[1]
 
-def __hospitalization_codice_struttura_erogante_parser(code):
+def __hospitalizations_codice_struttura_erogante_parser(code):
     h, t = str(code).split("-")
     return h + t
 
@@ -102,7 +99,6 @@ def __load():
     Crea i dataframe ricoveri e risorse, salvandoli in determinati file
     Returns
     -------
-
     '''
     file_sdo_2011 = "../RawData/03-01-2011-01-01-2012/sdo.csv"
     file_anagrafica_2011 = "../RawData/03-01-2011-01-01-2012/anagrafica.csv"
@@ -144,23 +140,20 @@ def __load():
     hospitalizations["data_ricovero"] = pd.to_datetime(hospitalizations["data_ricovero"])
     hospitalizations.sort_values('data_ricovero', inplace=True)
 
-    hospitalizations['codice_struttura_erogante'] = hospitalizations['codice_struttura_erogante'].apply(
-        __hospitalization_codice_struttura_erogante_parser)
+    hospitalizations['codice_struttura_erogante'].apply(__hospitalizations_codice_struttura_erogante_parser, inplace=True)
 
     risorse = pd.read_csv("../RawData/specialtyCapacitySchedules.csv",
                           usecols=['codice_struttura_erogante', 'codici_specialita',
                                    'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
                                    'FRIDAY', 'SATURDAY', 'SUNDAY',
                                    'capacita_max', 'year'])
-    risorse['codice_struttura_erogante'] = risorse['codice_struttura_erogante'].apply(__risorse_codice_ospedale_parser)
-    risorse['codici_specialita'] = risorse['codici_specialita'].apply(__risorse_idspec_parser)
+    risorse['codice_struttura_erogante'].apply(__risorse_codice_ospedale_parser,  inplace=True)
+    risorse['codici_specialita'].apply(__risorse_idspec_parser,  inplace=True)
 
     filename = '../DatiElaborati/risorse_simulazione'
     joblib.dump(risorse, filename)
-    print("Creazione file ", filename)
     filename = '../DatiElaborati/ricoveri_simulazione'
     joblib.dump(hospitalizations, filename)
-    print("Creazione file ", filename)
     return risorse, hospitalizations
 
 
