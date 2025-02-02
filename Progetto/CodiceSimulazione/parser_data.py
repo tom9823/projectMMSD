@@ -42,7 +42,7 @@ def initialize_hospitals(risorse):
      'capacita_max']}}
     """
     # Ottengo la lista dei codici ospedali senza duplicati
-    hosp_series = risorse['codici_ospedale'].drop_duplicates()
+    hosp_series = risorse['codice_struttura_erogante'].drop_duplicates()
     # Ottengo la lista degli anni senza duplicati
     year_series = risorse['year'].drop_duplicates()
     filename = '../DatiElaborati/hosp_series'
@@ -58,7 +58,7 @@ def initialize_hospitals(risorse):
         for y in year_series:
             y_dict = {}
             for index, row in risorse.iterrows():
-                if val == row['codici_ospedale']:
+                if val == row['codice_struttura_erogante']:
                     if y == row['year']:
                         y_dict[row['codici_specialita']] = [row['MONDAY'],
                                                             row['TUESDAY'],
@@ -70,7 +70,7 @@ def initialize_hospitals(risorse):
                                                             row['capacita_max']]
             tmp_dict[y] = y_dict
         final_dict[val] = tmp_dict
-
+    #codice struttura erogante punta ad anno il quale punta a codici_specialita il quale punta alle diverse info
     print(f'Lunghezza indice: {index}')
     print('Fine creazione dizionario ospedali')
     filename = '../DatiElaborati/hosp_dict_resources'
@@ -85,7 +85,7 @@ def __risorse_idspec_parser(s):
         id_spec = tmp_id_spec.split("0")[1]
     else:
         id_spec = tmp_id_spec
-    return int(id_spec)
+    return str(id_spec)
 
 def __risorse_codice_ospedale_parser(code):
     return str(code).split("_")[1]
@@ -112,8 +112,9 @@ def __load():
     for i in range(len(sdo_list)):
         sdo_path = sdo_list[i]
         anagrafica_path = anagrafica_list[i]
-        sdo_dataframe = pd.read_csv(sdo_path, usecols=[0, 1, 2, 3, 6, 10, 15, 25, 26, 27, 35, 37], header=0)
-        sdo_dataframe.columns = [
+        import pandas as pd
+
+        sdo_dataframe_columns = [
             'anno',
             'mese',
             'giorno',
@@ -127,8 +128,36 @@ def __load():
             'cod_branca_ammissione',
             'cod_branca_dimissione'
         ]
+
+        sdo_dataframe_dtype_columns = {
+            'anno': 'int64',  # Anno: intero
+            'mese': 'int64',  # Mese: intero
+            'giorno': 'int64',  # Giorno: intero
+            'id_ricovero': 'string',  # ID Ricovero: stringa
+            'data_dimissione': 'string',
+            'data_ricovero': 'string',
+            'giorni_degenza': 'int64',  # Giorni di Degenza: intero
+            'asl_territoriale': 'string',  # ASL Territoriale: stringa
+            'asl_erogante': 'string',  # ASL Erogante: stringa
+            'codice_struttura_erogante': 'string',  # Codice Struttura Erogante: stringa
+            'cod_branca_ammissione': 'string',  # Codice Branca Ammissione: stringa
+            'cod_branca_dimissione': 'string'  # Codice Branca Dimissione: stringa
+        }
+
+        sdo_dataframe = pd.read_csv(
+            sdo_path,
+            usecols=[0, 1, 2, 3, 6, 10, 15, 25, 26, 27, 35, 37],
+            header=0,
+            names=sdo_dataframe_columns,
+            dtype=sdo_dataframe_dtype_columns,
+        )
+
         sdo_dataframe['match_cod_branca'] = sdo_dataframe['cod_branca_ammissione'] == sdo_dataframe['cod_branca_dimissione']
-        anagrafica_dataframe = pd.read_csv(anagrafica_path)
+        dtype_anagrafica_columns= {
+            'codice_struttura_erogante': 'string',
+            'nome_comune_residenza': 'string'
+        }
+        anagrafica_dataframe = pd.read_csv(anagrafica_path, usecols=[0, 3], names=['codice_struttura_erogante','nome_comune_residenza'], dtype=dtype_anagrafica_columns )
         sdo_dataframe.set_index(sdo_dataframe.columns[3], inplace=True)
         anagrafica_dataframe.set_index(anagrafica_dataframe.columns[0], inplace=True)
         hospitalizations = pd.concat([hospitalizations, sdo_dataframe.merge(
@@ -137,18 +166,35 @@ def __load():
             right_index=True
         )], axis=0)
 
+    hospitalizations['codice_struttura_erogante'] = hospitalizations['codice_struttura_erogante'].apply(__hospitalizations_codice_struttura_erogante_parser)
     hospitalizations["data_ricovero"] = pd.to_datetime(hospitalizations["data_ricovero"])
     hospitalizations.sort_values('data_ricovero', inplace=True)
 
-    hospitalizations['codice_struttura_erogante'].apply(__hospitalizations_codice_struttura_erogante_parser, inplace=True)
+    risorse_dtype = {
+        'codice_struttura_erogante': 'string',  # Stringa
+        'codici_specialita': 'string',  # Stringa
+        'MONDAY': 'int64',  # Intero
+        'TUESDAY': 'int64',  # Intero
+        'WEDNESDAY': 'int64',  # Intero
+        'THURSDAY': 'int64',  # Intero
+        'FRIDAY': 'int64',  # Intero
+        'SATURDAY': 'int64',  # Intero
+        'SUNDAY': 'int64',  # Intero
+        'capacita_max': 'int64',  # Intero
+        'year': 'int64'  # Intero
+    }
 
-    risorse = pd.read_csv("../RawData/specialtyCapacitySchedules.csv",
-                          usecols=['codice_struttura_erogante', 'codici_specialita',
-                                   'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
-                                   'FRIDAY', 'SATURDAY', 'SUNDAY',
-                                   'capacita_max', 'year'])
-    risorse['codice_struttura_erogante'].apply(__risorse_codice_ospedale_parser,  inplace=True)
-    risorse['codici_specialita'].apply(__risorse_idspec_parser,  inplace=True)
+    # Lettura del CSV con dtypes specificati
+    risorse = pd.read_csv(
+        "../RawData/specialtyCapacitySchedules.csv",
+        usecols=['codice_struttura_erogante', 'codici_specialita',
+                 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY',
+                 'FRIDAY', 'SATURDAY', 'SUNDAY',
+                 'capacita_max', 'year'],
+        dtype=risorse_dtype
+    )
+    risorse['codice_struttura_erogante'] = risorse['codice_struttura_erogante'].apply(__risorse_codice_ospedale_parser)
+    risorse['codici_specialita'] = risorse['codici_specialita'].apply(__risorse_idspec_parser)
 
     filename = '../DatiElaborati/risorse_simulazione'
     joblib.dump(risorse, filename)
@@ -174,10 +220,13 @@ def load_data():
         pazienti.
 
     """
-    risorse, ricoveri = __load()
+    try:
+        risorse = joblib.load('../DatiElaborati/risorse_simulazione')
+        ricoveri = joblib.load('../DatiElaborati/ricoveri_simulazione')
+    except:
+        risorse, ricoveri = __load()
 
     return risorse, ricoveri
-
 
 def load_hosp_dict(risorse):
     """
@@ -210,8 +259,6 @@ def load_policy_data():
     try:
         dict_mapping = joblib.load('../DatiElaborati/mappingOspCom')
     except Exception:
-        path = '../DatiOriginali/mapping_hosp_comuni.csv'
-        name = 'mappingOspCom'
         dict_mapping = parser_distanze.dict_mapping()
 
     try:
@@ -222,16 +269,25 @@ def load_policy_data():
     return dict_mapping, dict_distances
 
 
-def load_residenze():
+def load_residenze(dataframe_hospitalizations):
+    final_dict = dict()
     """
-    Carica il dizionario di: id del record del paziente, nome comune di residenza del paziente ed
-    id del comune di residenza
+    Carica il dizionario con chiave id del record del paziente valore (nome comune di residenza del paziente, id del comune di residenza del paziente)
     """
-    try:
-        dict_res = joblib.load('../Dati_Elaborati/map_pat_idComRes')
-    except:
-        dict_res = parser_distanze.dict_map_id_ricovero_nome_id_comune()
-    return dict_res
+    # Creo il dizionario di mapping tra id del record del paziente e l'id del comune di residenza.
+    # Avrò {id_r:id_residenza}, avrò bisogno del file di mapping tra nome del comune e suo id
+    dataframe_hospitalizations['nome_comune_residenza'] = dataframe_hospitalizations['nome_comune_residenza'].str.lower()
+    dataframe_hospitalizations['nome_comune_residenza'] = dataframe_hospitalizations['nome_comune_residenza'].str.replace(r"\s+", "", regex=True)
+    comuni_ita = pd.read_csv('../RawData/Elenco-comuni-italiani.csv', usecols=[4, 5])
+    comuni_ita.columns = ['id_comune_paziente', 'nome_comune_residenza']
+    comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.lower()
+    comuni_ita.dropna(subset=['nome_comune_residenza'])
+    comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.replace(r"\s+", "", regex=True)
+    mapping_dict = comuni_ita.set_index("nome_comune_residenza")["id_comune_paziente"].astype(str).to_dict()
+    dataframe_hospitalizations["id_comune_paziente"] = dataframe_hospitalizations["nome_comune_residenza"].map(mapping_dict).astype(str)
+    final_dict = dict([(i, [a, b]) for i, a, b in zip(dataframe_hospitalizations.index, dataframe_hospitalizations.nome_comune_residenza, dataframe_hospitalizations.id_comune_paziente)])
+    joblib.dump(final_dict, '../DatiElaborati/mapping_idHospitalizations_idComuneResidenzaNomeComuneResidenza')
+    return final_dict
 
 
 if __name__ == '__main__':

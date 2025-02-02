@@ -9,19 +9,20 @@ from Progetto.CodiceSimulazione.objects_classes import OptimizerModelType
 
 
 def __find_distance(id_com_hospitalization, id_hosp, map_hospital_comune, dict_distances):
-    # Dato un id comune h e id_ospedale restituisce la distanza dal comune del paziente a
+    # Dato un id comune hospitalization ed id_ospedale restituisce la distanza dal comune del paziente riceoverato a
     # quell'ospedale
     if id_com_hospitalization == None:
         return 0
-    id_com_hosp = map_hospital_comune.get(int(id_hosp), None)
-    if id_com_hosp == None:
-        # id_com_hosp = '4078'
+    id_com_hosp = map_hospital_comune.get(id_hosp, None)
+    if id_com_hosp == None or id_com_hosp == id_com_hospitalization:
         return 0
     tmp = dict_distances.get(str(id_com_hospitalization), None)
     if tmp == None:
         dis = 1
     else:
-        dis = tmp.get(int(id_com_hosp), None)
+        dis = tmp.get(id_com_hosp, None)
+        if dis == None:
+            dis = 1
     return int(dis)
 
 
@@ -31,7 +32,7 @@ def calc_pat_to_reassign(hospitalization_day_dataframe_list, hosp_id_list, hosp_
     for next_day in hospitalization_day_dataframe_list:
         for index, hospitalization in next_day.iterrows():
             patient_id_hosp = hospitalization.loc['codice_struttura_erogante']
-            patient_id_spec = hospitalization.loc['COD_BRANCA']
+            patient_id_spec = hospitalization.loc['cod_branca_ammissione']
 
             if (int(patient_id_hosp) in hosp_id_list) or (int(patient_id_spec) in hosp_spec_id_list):
                 patient_to_reassign_dict[index] = hospitalization
@@ -43,7 +44,7 @@ def calc_pat_to_reassign(hospitalization_day_dataframe_list, hosp_id_list, hosp_
 def rest_days(patient_to_reassing):
     l = {}
     for index, p in patient_to_reassing.iterrows():
-        l.update({index: p['gg_degenza']})
+        l.update({index: p['giorni_degenza']})
     return l
 
 
@@ -75,7 +76,7 @@ def all_distance(hospitalization_to_reassing, specialty_closed_list_string, hosp
             for h in hosp_list:
                 if specialty_closed__string == h.id_hosp:
                     if h.id_spec == spec:
-                        dis = __find_distance(hospitalization['codice_comune_residenza'], h.id_hosp, map_hospital_comune, dict_distances)
+                        dis = __find_distance(hospitalization['id_comune_paziente'], h.id_hosp, map_hospital_comune, dict_distances)
                         d.update({(hospitalization_id, h.id_hosp): dis})
     return d
 
@@ -136,14 +137,14 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
     if not hospitalization_to_reassign_dataframe_compat.empty:
 
         # Li divido per specialità per poter utilizzare l'ottimizzatore su gruppi omogenei
-        hospitalization_by_spec_dataframe_list = [hospitalization_to_reassign_dataframe_compat[hospitalization_to_reassign_dataframe_compat['COD_BRANCA'] == valore].copy() for valore in hospitalization_to_reassign_dataframe_compat['COD_BRANCA'].unique()]
+        hospitalization_by_spec_dataframe_list = [hospitalization_to_reassign_dataframe_compat[hospitalization_to_reassign_dataframe_compat['cod_branca_ammissione'] == valore].copy() for valore in hospitalization_to_reassign_dataframe_compat['cod_branca_ammissione'].unique()]
 
         # Per ogni specialità calcolo un modello
         print(
             f'Gruppi di specialità: {len(hospitalization_by_spec_dataframe_list)}. Totale pazienti: {uf.count_total_patient(hospitalization_by_spec_dataframe_list)}.')
         spec_counter = 1
         for hospitalization_by_spec_dataframe in hospitalization_by_spec_dataframe_list:
-            current_spec_id = hospitalization_by_spec_dataframe['COD_BRANCA'].iloc[0]
+            current_spec_id = hospitalization_by_spec_dataframe['cod_branca_ammissione'].iloc[0]
             # print(current_spec_id)
             print(
                 f'Ottimizzando per la specialità: {current_spec_id}. Quantità pazienti in codesta specialità: {len(hospitalization_by_spec_dataframe)}')

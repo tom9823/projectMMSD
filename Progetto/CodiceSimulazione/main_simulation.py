@@ -18,8 +18,7 @@ import remove_resources as rr
 import reassing_hospital as rh
 
 
-def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit,
-                     name):
+def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit, name):
     """
     Inizio simulazione.
 
@@ -82,7 +81,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 
     # Conto quanti pazienti ci sono
     hospitalization_count = uf.count_total_patient(hospitalization_day_list)
-    print("Totale pazienti: " + str(hospitalization_count))
+    print("Totale ricoveri: " + str(hospitalization_count))
 
     # Contatore dei giorni, non modificare
     simulation_day_index = 0
@@ -150,16 +149,18 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 upper_threshold_simulation_day_index = simulation_day_index + remaining_days_to_sunday  # remaining_days_to_sunday sta per i giorni mancanti alla prossima domenica
                 if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                     upper_threshold_simulation_day_index = len(hospitalization_day_list)
-                new_anticipated_days, time_optimization = rh.optimization_reassing(simulation_day_index,
-                                                                                   upper_threshold_simulation_day_index,
-                                                                                   hospitalization_day_list,
-                                                                                   resources_to_remove[0],
-                                                                                   resources_to_remove[1],
-                                                                                   hosp_spec_list_object,
-                                                                                   policy_resources[0],
-                                                                                   policy_resources[1],
-                                                                                   policy_resources[2], solver,
-                                                                                   time_limit, optimizer_model_type)
+                new_anticipated_days, time_optimization = rh.optimization_reassing(simulation_day_index= simulation_day_index,
+                                                                                   upper_threshold_simulation_day_index= upper_threshold_simulation_day_index,
+                                                                                   hospitalization_day_list_dataframe= hospitalization_day_list,
+                                                                                   closing_hosp_id_list= resources_to_remove[0],
+                                                                                   closing_spec_list= resources_to_remove[1],
+                                                                                   hosp_spec_list_object= hosp_spec_list_object,
+                                                                                   dict_mapping_hospital_com= policy_resources[0],
+                                                                                   dict_distances_between_com= policy_resources[1],
+                                                                                   dict_mapping_com_hospital= policy_resources[2],
+                                                                                   solver= solver,
+                                                                                   time_limit= time_limit,
+                                                                                   optimizer_model_type= optimizer_model_type)
                 print(f"Ottimizzazione durata: {time_optimization} secondi")
                 hospitalization_day_list[
                 simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
@@ -190,7 +191,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
         for index, hospitalization_record in hospitalization_day_dataframe.iterrows():
             # Leggo e salvo le info del paziente
             hospitalization_record_id_hosp = hospitalization_record.loc['codice_struttura_erogante']
-            hospitalization_record_id_spec = hospitalization_record.loc['COD_BRANCA']
+            hospitalization_record_id_spec = hospitalization_record.loc['cod_branca_ammissione']
             hospitalization_record_id_ricovero = index
 
             # Controllo se l'ospedale o la specialità è stata eliminata, nel caso li aggiorno con la policy
@@ -213,7 +214,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                                hospitalization_record_id_hosp,
                                                                                                hospitalization_record_id_spec)
 
-            hospitalization_record_rest_time = int(hospitalization_record.loc['gg_degenza'])
+            hospitalization_record_rest_time = int(hospitalization_record.loc['giorni_degenza'])
 
             hospitalization_record_recovery_date = hospitalization_record['data_ricovero'].strftime("%Y-%m-%d")
 
@@ -303,7 +304,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 # ciclo per tutti i ricoveri di next_day
                 for id_hospitalization, hospitalization_record in next_day.iterrows():
                     hospitalization_record_id_hosp = hospitalization_record.loc['codice_struttura_erogante']
-                    hospitalization_record_id_spec = hospitalization_record.loc['COD_BRANCA']
+                    hospitalization_record_id_spec = hospitalization_record.loc['cod_branca_ammissione']
                     # individua l'oggetto ospedale e specialità del paziente
                     hospitalization_record_hospital_specialty_object = uf.get_hospitalization_hospital(
                         hosp_spec_list_object,
@@ -320,7 +321,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                         hospitalization_record_hospital_specialty_object.
                                         counter_current_day_patients_recovered + 1)
 
-                                hospitalization_record_rest_time = int(hospitalization_record.loc['gg_degenza'])
+                                hospitalization_record_rest_time = int(hospitalization_record.loc['giorni_degenza'])
                                 hospitalization_record_recovery_date = (
                                     str(hospitalization_record['data_ricovero']).split(" ")[0])
                                 current_hospitalization_patient_object = oc.Patient(id_hospitalization,
@@ -406,7 +407,7 @@ def calculate_distance(hospitalization_row, dict_mapping_hospital_com, dict_dist
     return int(dis)
 
 def calculate_distance_wrapper(row):
-    return calculate_distance(row, dict_mapping_hospital_com, dict_distances_com)
+    return calculate_distance(row, dict_mapping_hospital_com, dict_distances_between_com)
 
 
 
@@ -414,15 +415,22 @@ if __name__ == '__main__':
     # Nome del file in cui salvare le statistiche e logs
     name = 'SOMMA'
     # Caricamento dei dati di partenza
-    resources, patients = parser_data.load_data()
-    patients = patients.set_index(
-        'n_record')  # le colonne dei giorni indicano il numero di pazienti ricoverabili nel giorno stesso mentre l'ultima colonna K_MAX indica la capacità giornaliera per poterli curare
+    resources, hospitalizations = parser_data.load_data()
+     # le colonne dei giorni indicano il numero di pazienti ricoverabili nel giorno stesso mentre l'ultima colonna K_MAX indica la capacità giornaliera per poterli curare
     hosp_dict = parser_data.load_hosp_dict(resources)
+    dtypes = {
+        "codice_struttura_erogante": "str",
+        "id_comune": "str",
+    }
+    mapping_hosp_comuni_dataframe = pd.read_csv("../RawData/mapping_hosp_comuni.csv", header=0, dtype=dtypes)
+    mapping_dict = mapping_hosp_comuni_dataframe.set_index("codice_struttura_erogante")["id_comune_struttura_erogante"].astype(str).to_dict()
+    hospitalizations["id_comune_struttura_erogante"] = hospitalizations["codice_struttura_erogante"].map(mapping_dict).astype(str)
+
     # leggo file in cui sono definiti le risorse(ospedale con relativa specialità) da chiudere e date chiusura
     file = "../Parametri/remove_info.txt"
     hosp_id_list, hosp_spec_list, date = rr.read_input(file)
     # dizionario che mappa comune con ospedale
-    dict_mapping_hospital_com, dict_distances_com = parser_data.load_policy_data()
+    dict_mapping_hospital_com, dict_distances_between_com = parser_data.load_policy_data()
     # stesso dizionario di dict_mapping ma con chiave valore invertito (inverso di quello sopra)
     dict_mapping_com_hospital = {v: k for k, v in dict_mapping_hospital_com.items()}
     # Solver del modello di ottimizzazione
@@ -430,35 +438,25 @@ if __name__ == '__main__':
     # Tempo in secondi a disposizione del solver
     time_limit = 10
     # dizionario per la residenza del paziente
-    dict_id_hospitalization_array_nome_and_id_comune = parser_data.load_residenze()
-    # aggiungo il codice comune residenza ed il nome del comune del paziente ricoverato al record del ricovero
-    patients = patients.join(pd.DataFrame.from_dict(dict_id_hospitalization_array_nome_and_id_comune, orient='index',
-                                                    columns=['nome_comune_residenza', 'codice_comune_residenza']))
-    patients['codice_comune_residenza'] = (
-        patients['codice_comune_residenza']
-        .astype('Int64')  # o 'Int32', se preferisci
-    )
-    patients['join_residenza_match'] = patients['nome_comune_residenza'].notna() | patients[
-        'codice_comune_residenza'].notna()
-    patients.loc[patients['join_residenza_match'] == False, 'codice_comune_residenza'] = (
-        patients.loc[patients['join_residenza_match'] == False]
-        .apply(lambda row: int(dict_mapping_hospital_com.get(int(row['codice_struttura_erogante'])), 0)
-        if pd.notnull(row['codice_struttura_erogante'])
-        else 0, axis=1)
-    )
+    dict_id_hospitalization_array_nome_and_id_comune = parser_data.load_residenze(hospitalizations)
     # inizializzo la colonna codice_struttura_erogante_nuova
-    patients['codice_struttura_erogante_nuova'] = ''
-    patients['distanza_vecchio_ospedale'] = 0
-
-    mask = patients['join_residenza_match'] == True
-    patients.loc[mask, 'distanza_vecchio_ospedale'] = (
-        patients.loc[mask].apply(calculate_distance_wrapper, axis=1)
+    hospitalizations['codice_struttura_erogante_nuova'] = ''
+    hospitalizations["distanza_vecchio_ospedale"] = hospitalizations.apply(
+        lambda row: (
+            0 if row['id_comune_struttura_erogante'] == row['id_comune_paziente'] else (
+                1 if (tmp := dict_distances_between_com.get(str(row["id_comune_paziente"]), None)) is None
+                else tmp.get(str(row['id_comune_struttura_erogante']), 1)
+            )
+        ),
+        axis=1
     )
-
-    patients['distanza_nuovo_ospedale'] = 0
-    patients['discomfort'] = 0
-    start_simulation(patients, hosp_dict, [hosp_id_list, hosp_spec_list, date], [dict_mapping_hospital_com,
-                                                                                 dict_distances_com,
-                                                                                 dict_mapping_com_hospital],
-                     solver,
-                     time_limit, name)
+    hospitalizations['distanza_nuovo_ospedale'] = 0
+    hospitalizations['discomfort'] = 0
+    start_simulation(hospitalization_dataframe=hospitalizations,
+                     hosp_dict=hosp_dict,
+                     resources_to_remove=[hosp_id_list, hosp_spec_list, date],
+                     policy_resources=[dict_mapping_hospital_com, dict_distances_between_com, dict_mapping_com_hospital],
+                     solver=solver,
+                     time_limit=time_limit,
+                     name=name
+                     )

@@ -137,16 +137,17 @@ def dict_comuni_hosp():
     # Creo il dizionario della tabella del file distanzeComuniOspedali.csv. (quello con tutto)
     # il dizionario sarà {id_c:{id_ch : dis}}. id_c è l'id del comune (riga), id_ch è l'id del 
     # comune dell'ospedale (colonna), e dis è la distanza in metri
-    df = pd.read_csv(path)
+    df = pd.read_csv('../RawData/distanzeComuniOspedali.csv')
     final_dict = {}
     col_names = df.columns.values[2:]
     for index, row in df.iterrows():
         h_dict = {}
         for c in col_names:
-            h_dict[int(c)] = float(row.loc[c])
+            h_dict[str(c)] = float(row.loc[c])
         final_dict[(str(int(row.loc['comune'])))] = h_dict
 
     joblib.dump(final_dict, '../DatiElaborati/distanzeComuniOspedali')
+    return final_dict
 
 def dict_comunihosp(path, name):
     # Creo il dizionario della tabella del file distanzeComuniOspedali.csv.
@@ -167,42 +168,24 @@ def dict_comunihosp(path, name):
 
 def dict_mapping():
     # Creo il dizionario del mapping del file mapping_hosp_comuni.csv
-    # il dizionario sarà {id_c:id_h} con id_c l'id del comune e id_h l'id
+    # il dizionario sarà {id_h:id_c} con id_c l'id del comune e id_h l'id
     # dell'ospedale di quel comune
-    df = pd.read_csv(path, dtype={'id_hosp':int, 'id_comuni':str})
+    path = '../RawData/mapping_hosp_comuni.csv'
+    df = pd.read_csv(
+        path,
+        usecols=['codice_struttura_erogante', 'id_comune_struttura_erogante'],
+        dtype={
+            'codice_struttura_erogante': 'string',
+            'id_comune_struttura_erogante': 'string'
+        }
+    )
     final_dict = {}
     for index, row in df.iterrows():        
-        final_dict[row.iloc[0]] = row.iloc[1]
+        final_dict[str(row.iloc[0])] = str(row.iloc[1])
     joblib.dump(final_dict, '../DatiElaborati/mappingOspCom')
-
-# nei ricoveri abbiamo associazione tra paziente e nome del comune per cui dobbiamo estrarre i nomi dei comuni di residenza dei pazienti
-def dict_map_id_ricovero_nome_id_comune():
-    # Creo il dizionario di mapping tra id del record del paziente e l'id del comune di residenza.
-    # Avrò {id_r:id_residenza}, avrò bisogno del file di mapping tra nome del comune e suo id.
-    an = '/anagrafica.csv'
-    df_2011 = pd.read_csv('../DatiOriginali/03-01-2011-01-01-2012'+an, usecols=[0,3], names=['id_record','nome_comune_residenza'])
-    df_2012 = pd.read_csv('../DatiOriginali/02-01-2012-30-12-2012'+an, usecols=[0,3], names=['id_record','nome_comune_residenza'])
-    df_2013 = pd.read_csv('../DatiOriginali/31-12-2012-29-12-2013'+an, usecols=[0,3], names=['id_record','nome_comune_residenza'])
-
-    df_concat = pd.concat([df_2011, df_2012, df_2013], axis=0, join='outer', ignore_index=False)
-    df_concat.dropna(subset=['nome_comune_residenza'])
-    df_concat['nome_comune_residenza'] = df_concat['nome_comune_residenza'].str.lower()
-    # per rimuovere gli spazi dai nomi delle città
-    df_concat['nome_comune_residenza'] = df_concat['nome_comune_residenza'].str.replace(r"\s+", "", regex=True)
-    try: 
-        comuni_ita = pd.read_csv('../DatiOriginali/Elenco-comuni-italiani.csv', usecols=[4,5])
-    except:     
-        read_file = pd.read_excel ('../DatiOriginali/Elenco-comuni-italiani.xls')
-        read_file.to_csv ('../DatiOriginali/Elenco-comuni-italiani.csv', index = None, header=True)
-        comuni_ita = pd.read_csv('../DatiOriginali/Elenco-comuni-italiani.csv', usecols=[4,5])
-    comuni_ita.columns = ['id_comune', 'nome_comune_residenza']
-    comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.lower()
-    comuni_ita.dropna(subset=['nome_comune_residenza'])
-    comuni_ita['nome_comune_residenza'] = comuni_ita['nome_comune_residenza'].str.replace(r"\s+", "", regex=True)
-    res = pd.merge(df_concat, comuni_ita, on='nome_comune_residenza')
-    final_dict = dict([(i,[a,b]) for i, a,b in zip(res.id_record, res.nome_comune_residenza,res.id_comune)])
-    joblib.dump(final_dict, '../DatiOriginali/map_pat_idComRes')
     return final_dict
+
+
 
 if __name__ == '__main__':
     ppath = "Dati/"
@@ -231,12 +214,6 @@ if __name__ == '__main__':
     path = 'Dati/general/distanzeComuniOspedali.csv'
     name = 'distanzeOspedali'
     #dict_comunihosp(path, name)
-    
-    # Creazione del dizionario del file mapping_hosp_comuni.csv # per invertire il dizionario 
-    # inv_map = {v: k for k, v in my_map.items()}
-    path = 'Dati/general/mapping_hosp_comuni.csv'
-    name = 'mappingOspCom'
-    #dict_mapping(path, name)
 
     # Creazione del dizionario di mapping tra id del record del paziente e id del comune di residenza.
     # I file sono i anagrafica.csv in extraction
