@@ -18,11 +18,11 @@ def __find_distance(id_com_hospitalization, id_hosp, map_hospital_comune, dict_d
         return 0
     tmp = dict_distances.get(str(id_com_hospitalization), None)
     if tmp == None:
-        dis = 1
+        dis = 0
     else:
         dis = tmp.get(id_com_hosp, None)
         if dis == None:
-            dis = 1
+            dis = 0
     return int(dis)
 
 
@@ -44,7 +44,7 @@ def calc_pat_to_reassign(hospitalization_day_dataframe_list, hosp_id_list, hosp_
 def rest_days(patient_to_reassing):
     l = {}
     for index, p in patient_to_reassing.iterrows():
-        l.update({index: p['giorni_degenza']})
+        l.update({int(index): p['giorni_degenza']})
     return l
 
 
@@ -52,7 +52,7 @@ def list_pat(patient_to_reassing):
     list_pat = []
     P = {}
     for index, p in patient_to_reassing.iterrows():
-        list_pat.append(index)
+        list_pat.append(int(index))
     P.update({None: list_pat})
     return P
 
@@ -62,7 +62,7 @@ def __hosp_spec_list(hosp_lists, spec):
     tmp_hosp = []
     for h in hosp_lists:
         if h.id_spec == spec:
-            tmp_hosp.append(h.id_hosp)
+            tmp_hosp.append(int(h.id_hosp))
     H.update({None: tmp_hosp})
     return H, tmp_hosp
 
@@ -89,19 +89,23 @@ def calculate_gamma(l, H, hosp_list, spec, alfa):
     f_tot = 0  # capacità per tutti gli ospedali
     for h in tmp_h:
         for i in hosp_list:
-            if h == i.id_hosp:
+            if h == int(i.id_hosp):
                 if spec == i.id_spec:
                     f_tot += i.capacity[7]
+    if f_tot == 0:
+        return {h: 0 for h in tmp_h}  # Puoi restituire 0 o un altro valore
+
+    # Calcola gamma per ogni ospedale
     for h in tmp_h:
         f1 = 0
         for i in hosp_list:
-            if h == i.id_hosp:
-                if spec == i.id_spec:
-                    f1 = i.capacity[7]  # prendo la capacità massima
-        f = f1 / f_tot
-        """f è il rapporto tra capacità massima del singolo ospedale per specialità e capacità massima di tutti gli ospedali per specialità"""
+            if h == i.id_hosp and spec == i.id_spec:
+                f1 = i.capacity[7]  # prendo la capacità massima
+        #f è il rapporto tra capacità massima del singolo ospedale per specialità e capacità massima di tutti gli ospedali per specialità
+        f = f1 / f_tot  # Ora non si può più dividere per zero
         tmp_gamma = (1 + alfa) * f * L
         g.update({h: tmp_gamma})
+
     return g
 
 
@@ -155,7 +159,8 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
             # Creo dizionario None:lista id_ospedale (divisi per specialità)
             H, specialty_closed_list_string = __hosp_spec_list(hosp_spec_list_object, current_spec_id)
             # Creo dizionario id_ricovero:distanza_vecchio_ospedale
-            m = dict(zip(hospitalization_by_spec_dataframe.index, hospitalization_by_spec_dataframe['distanza_vecchio_ospedale']))
+            m = dict(zip(hospitalization_by_spec_dataframe.index.astype(int),
+                         hospitalization_by_spec_dataframe['distanza_vecchio_ospedale']))
 
             # Creo il dizionario (id_ricovero,id_hosp):dis per ogni paziente di quella specialità per ogni
             # ospedale con quella specialità

@@ -444,8 +444,8 @@ if __name__ == '__main__':
     hospitalizations["distanza_vecchio_ospedale"] = hospitalizations.apply(
         lambda row: (
             0 if row['id_comune_struttura_erogante'] == row['id_comune_paziente'] else (
-                1 if (tmp := dict_distances_between_com.get(str(row["id_comune_paziente"]), None)) is None
-                else tmp.get(str(row['id_comune_struttura_erogante']), 1)
+                0 if (tmp := dict_distances_between_com.get(str(row["id_comune_paziente"]), None)) is None
+                else tmp.get(str(row['id_comune_struttura_erogante']), 0)
             )
         ),
         axis=1
