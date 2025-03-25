@@ -157,7 +157,6 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                    hosp_spec_list_object= hosp_spec_list_object,
                                                                                    dict_mapping_hospital_com= policy_resources[0],
                                                                                    dict_distances_between_com= policy_resources[1],
-                                                                                   dict_mapping_com_hospital= policy_resources[2],
                                                                                    solver= solver,
                                                                                    time_limit= time_limit,
                                                                                    optimizer_model_type= optimizer_model_type)
@@ -359,7 +358,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                resources_to_remove[1],
                                                                                hosp_spec_list_object,
                                                                                policy_resources[0],
-                                                                               policy_resources[1], policy_resources[2], solver, time_limit,
+                                                                               policy_resources[1], solver, time_limit,
                                                                                optimizer_model_type)
             print(f"Ottimizzazione durata: {time_optimization} secondi")
             hospitalization_day_list[d1:upper_threshold_simulation_day_index] = new_anticipated_days
