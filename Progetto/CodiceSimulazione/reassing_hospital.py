@@ -62,7 +62,7 @@ def __hosp_spec_list(hosp_lists, spec):
     tmp_hosp = []
     for h in hosp_lists:
         if h.id_spec == spec:
-            tmp_hosp.append(int(h.id_hosp))
+            tmp_hosp.append(h.id_hosp)
     H.update({None: tmp_hosp})
     return H, tmp_hosp
 
@@ -72,9 +72,9 @@ def all_distance(hospitalization_to_reassing, specialty_closed_list_string, hosp
     d = dict()
     for index, hospitalization in hospitalization_to_reassing.iterrows():
         hospitalization_id = index
-        for specialty_closed__string in specialty_closed_list_string:
+        for specialty_closed_string in specialty_closed_list_string:
             for h in hosp_list:
-                if specialty_closed__string == h.id_hosp:
+                if specialty_closed_string == h.id_hosp:
                     if h.id_spec == spec:
                         dis = __find_distance(hospitalization['id_comune_paziente'], h.id_hosp, map_hospital_comune, dict_distances)
                         d.update({(hospitalization_id, h.id_hosp): dis})
@@ -125,7 +125,7 @@ def create_data(l, p, H, m, d, gamma):
 
 def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_index, hospitalization_day_list_dataframe,
                           closing_hosp_id_list, closing_spec_list, hosp_spec_list_object, dict_mapping_hospital_com,
-                          dict_distances_between_com, dict_mapping_com_hospital, solver, time_limit, optimizer_model_type):
+                          dict_distances_between_com, solver, time_limit, optimizer_model_type):
     start_time = time.time()
     new_list_hosp = []
     d = dict()
@@ -157,14 +157,14 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
             # Creo dizionario None:lista id_ricovero
             p = list_pat(hospitalization_by_spec_dataframe)
             # Creo dizionario None:lista id_ospedale (divisi per specialità)
-            H, specialty_closed_list_string = __hosp_spec_list(hosp_spec_list_object, current_spec_id)
+            H, hospital_specialty_closed_list_string = __hosp_spec_list(hosp_spec_list_object, current_spec_id)
             # Creo dizionario id_ricovero:distanza_vecchio_ospedale
             m = dict(zip(hospitalization_by_spec_dataframe.index.astype(int),
                          hospitalization_by_spec_dataframe['distanza_vecchio_ospedale']))
 
             # Creo il dizionario (id_ricovero,id_hosp):dis per ogni paziente di quella specialità per ogni
             # ospedale con quella specialità
-            d = all_distance(hospitalization_by_spec_dataframe, specialty_closed_list_string, hosp_spec_list_object, current_spec_id, dict_mapping_hospital_com,
+            d = all_distance(hospitalization_by_spec_dataframe, hospital_specialty_closed_list_string, hosp_spec_list_object, current_spec_id, dict_mapping_hospital_com,
                              dict_distances_between_com)
             alfa = 0.5
             gamma = calculate_gamma(l, H, hosp_spec_list_object, current_spec_id, alfa)
