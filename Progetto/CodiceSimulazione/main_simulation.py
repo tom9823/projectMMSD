@@ -5,7 +5,11 @@ Created on Tue Jan  5 12:57:59 2021
 
 @author: stevi
 """
+import cProfile
 import datetime
+import io
+import logging
+import pstats
 import time
 
 import pandas as pd
@@ -17,8 +21,11 @@ import objects_classes as oc
 import remove_resources as rr
 import reassing_hospital as rh
 
+DEFAULT_DISTANCE = 50000  # distanza in m se non si trova la corrispondenza
 
-def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit, name):
+
+def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit,
+                     name):
     """
     Inizio simulazione.
 
@@ -149,17 +156,18 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                 upper_threshold_simulation_day_index = simulation_day_index + remaining_days_to_sunday  # remaining_days_to_sunday sta per i giorni mancanti alla prossima domenica
                 if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                     upper_threshold_simulation_day_index = len(hospitalization_day_list)
-                new_anticipated_days, time_optimization = rh.optimization_reassing(simulation_day_index= simulation_day_index,
-                                                                                   upper_threshold_simulation_day_index= upper_threshold_simulation_day_index,
-                                                                                   hospitalization_day_list_dataframe= hospitalization_day_list,
-                                                                                   closing_hosp_id_list= resources_to_remove[0],
-                                                                                   closing_spec_list= resources_to_remove[1],
-                                                                                   hosp_spec_list_object= hosp_spec_list_object,
-                                                                                   dict_mapping_hospital_com= policy_resources[0],
-                                                                                   dict_distances_between_com= policy_resources[1],
-                                                                                   solver= solver,
-                                                                                   time_limit= time_limit,
-                                                                                   optimizer_model_type= optimizer_model_type)
+                new_anticipated_days, time_optimization = rh.optimization_reassing(
+                    simulation_day_index=simulation_day_index,
+                    upper_threshold_simulation_day_index=upper_threshold_simulation_day_index,
+                    hospitalization_day_list_dataframe=hospitalization_day_list,
+                    closing_hosp_id_list=resources_to_remove[0],
+                    closing_spec_list=resources_to_remove[1],
+                    hosp_spec_list_object=hosp_spec_list_object,
+                    dict_mapping_hospital_com=policy_resources[0],
+                    dict_distances_between_com=policy_resources[1],
+                    solver=solver,
+                    time_limit=time_limit,
+                    optimizer_model_type=optimizer_model_type)
                 print(f"Ottimizzazione durata: {time_optimization} secondi")
                 hospitalization_day_list[
                 simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
@@ -387,75 +395,150 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     end = time.time()
     print(f"Durata di esecuzione: {(end - start) / 60} minuti; {(end - start)} secondi.")
 
+# Setup logging
+def setup_logging():
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
 
-def calculate_distance(hospitalization_row, dict_mapping_hospital_com, dict_distances):
-    id_hosp = hospitalization_row['codice_struttura_erogante']
-    id_comune = hospitalization_row['codice_comune_residenza']
-    if id_comune == None:
-        # id_com_pat = ['cuneo', 4078]
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+
+    # Handler per il file
+    file_handler = logging.FileHandler("simulation.log", mode='w')
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    # Handler per la console
+    console_handler = logging.StreamHandler()
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
+
+setup_logging()
+
+
+
+def get_distance(row, distances):
+    if row.id_comune_struttura_erogante == row.id_comune_paziente:
         return 0
-    id_com_hosp = dict_mapping_hospital_com.get(int(id_hosp), None)
-    if id_com_hosp == None:
-        # id_com_hosp = '4078'
-        return 0
-    tmp = dict_distances.get(str(id_comune), None)
-    if tmp == None:
-        dis = 1
     else:
-        dis = tmp.get(int(id_com_hosp), None)
-    return int(dis)
+        comune_paziente = row.id_comune_paziente
+        comune_struttura = row.id_comune_struttura_erogante
+        return distances.get(comune_paziente, {}).get(comune_struttura, DEFAULT_DISTANCE)
 
-def calculate_distance_wrapper(row):
-    return calculate_distance(row, dict_mapping_hospital_com, dict_distances_between_com)
+def main():
+    logging.info("Inizio esecuzione main()")
+    start_time_total = time.perf_counter()
 
-
-
-if __name__ == '__main__':
-    # Nome del file in cui salvare le statistiche e logs
     name = 'SOMMA'
-    # Caricamento dei dati di partenza
+
+    # --- Caricamento dati di base ---
+    t0 = time.perf_counter()
     resources, hospitalizations = parser_data.load_data()
-     # le colonne dei giorni indicano il numero di pazienti ricoverabili nel giorno stesso mentre l'ultima colonna K_MAX indica la capacità giornaliera per poterli curare
     hosp_dict = parser_data.load_hosp_dict(resources)
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Caricamento dati base completato in {elapsed:.2f} secondi.")
+
+
+    # --- Mapping codice struttura -> id comune struttura ---
+    t0 = time.perf_counter()
     dtypes = {
         "codice_struttura_erogante": "str",
-        "id_comune": "str",
+        "id_comune_struttura_erogante": "str"
     }
-    mapping_hosp_comuni_dataframe = pd.read_csv("../RawData/mapping_hosp_comuni.csv", header=0, dtype=dtypes)
-    mapping_dict = mapping_hosp_comuni_dataframe.set_index("codice_struttura_erogante")["id_comune_struttura_erogante"].astype(str).to_dict()
-    hospitalizations["id_comune_struttura_erogante"] = hospitalizations["codice_struttura_erogante"].map(mapping_dict).astype(str)
+    mapping_hosp_comuni_dataframe = pd.read_csv("../RawData/mapping_hosp_comuni.csv", dtype=dtypes)
+    mapping_dict = mapping_hosp_comuni_dataframe.set_index("codice_struttura_erogante")["id_comune_struttura_erogante"].to_dict()
+    hospitalizations["id_comune_struttura_erogante"] = hospitalizations["codice_struttura_erogante"].map(mapping_dict)
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Mapping codice struttura -> id comune struttura completato in {elapsed:.2f} secondi.")
 
-    # leggo file in cui sono definiti le risorse(ospedale con relativa specialità) da chiudere e date chiusura
+    # --- Mappatura comune residenza ---
+    t0 = time.perf_counter()
+    hospitalizations = parser_data.load_residenze(hospitalizations)
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Mapping comune residenza -> id comune paziente completato in {elapsed:.2f} secondi.")
+
+    # --- Caricamento policy di chiusura ospedali ---
+    t0 = time.perf_counter()
     file = "../Parametri/remove_info.txt"
     hosp_id_list, hosp_spec_list, date = rr.read_input(file)
-    # dizionario che mappa comune con ospedale
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Lettura policy rimozione ospedali completata in {elapsed:.2f} secondi.")
+
+    # --- Caricamento mapping di distanze tra comuni ---
+    t0 = time.perf_counter()
     dict_mapping_hospital_com, dict_distances_between_com = parser_data.load_policy_data()
-    # stesso dizionario di dict_mapping ma con chiave valore invertito (inverso di quello sopra)
     dict_mapping_com_hospital = {v: k for k, v in dict_mapping_hospital_com.items()}
-    # Solver del modello di ottimizzazione
-    solver = "glpk"
-    # Tempo in secondi a disposizione del solver
-    time_limit = 10
-    # dizionario per la residenza del paziente
-    dict_id_hospitalization_array_nome_and_id_comune = parser_data.load_residenze(hospitalizations)
-    # inizializzo la colonna codice_struttura_erogante_nuova
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Caricamento policy e dizionari distanze completato in {elapsed:.2f} secondi.")
+
+    # --- Calcolo distanza vecchio ospedale ---
+    t0 = time.perf_counter()
     hospitalizations['codice_struttura_erogante_nuova'] = ''
-    hospitalizations["distanza_vecchio_ospedale"] = hospitalizations.apply(
-        lambda row: (
-            0 if row['id_comune_struttura_erogante'] == row['id_comune_paziente'] else (
-                0 if (tmp := dict_distances_between_com.get(str(row["id_comune_paziente"]), None)) is None
-                else tmp.get(str(row['id_comune_struttura_erogante']), 0)
-            )
-        ),
-        axis=1
-    )
+    hospitalizations["distanza_vecchio_ospedale"] = [
+        get_distance(row, dict_distances_between_com)
+        for row in hospitalizations[["id_comune_paziente", "id_comune_struttura_erogante"]].itertuples(index=False)
+    ]
     hospitalizations['distanza_nuovo_ospedale'] = 0
     hospitalizations['discomfort'] = 0
-    start_simulation(hospitalization_dataframe=hospitalizations,
-                     hosp_dict=hosp_dict,
-                     resources_to_remove=[hosp_id_list, hosp_spec_list, date],
-                     policy_resources=[dict_mapping_hospital_com, dict_distances_between_com, dict_mapping_com_hospital],
-                     solver=solver,
-                     time_limit=time_limit,
-                     name=name
-                     )
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Calcolo distanza vecchio ospedale completato in {elapsed:.2f} secondi.")
+
+    # --- Calcolo matrice distanza ---
+    t0 = time.perf_counter()
+    distance_df = generate_distance_matrix(
+        hospitalizations=hospitalizations,
+        mapping_hosp_comuni_path="../RawData/mapping_hosp_comuni.csv",
+        dict_distances_between_com=dict_distances_between_com
+    )
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Calcolo matrice distanza completato in {elapsed:.2f} secondi.")
+    # --- Avvio simulazione ---
+    t0 = time.perf_counter()
+    start_simulation(
+        hospitalization_dataframe=hospitalizations,
+        hosp_dict=hosp_dict,
+        resources_to_remove=[hosp_id_list, hosp_spec_list, date],
+        policy_resources=[dict_mapping_hospital_com, dict_distances_between_com, dict_mapping_com_hospital],
+        solver="glpk",
+        time_limit=10,
+        name=name
+    )
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Simulazione completata in {elapsed:.2f} secondi.")
+
+    # --- Fine esecuzione ---
+    total_elapsed = time.perf_counter() - start_time_total
+    logging.info(f"Esecuzione main() completata in {total_elapsed:.2f} secondi.")
+
+
+def generate_distance_matrix(hospitalizations, mapping_hosp_comuni_path, dict_distances_between_com):
+    # Carica la lista ospedali
+    hospitals_df = pd.read_csv(mapping_hosp_comuni_path, dtype={"codice_struttura_erogante": "string", "id_comune_struttura_erogante": "string"})
+
+    rows = []
+
+    for patient in hospitalizations.itertuples():
+        id_ricovero = patient.Index
+        id_comune_paziente = patient.id_comune_paziente
+
+        for hospital in hospitals_df.itertuples(index=False):
+            codice_ospedale = hospital.codice_struttura_erogante
+            id_comune_ospedale = hospital.id_comune_struttura_erogante
+
+            if id_comune_paziente == id_comune_ospedale:
+                distanza = 0
+            else:
+                distanza = dict_distances_between_com.get(id_comune_paziente, {}).get(id_comune_ospedale, DEFAULT_DISTANCE)
+
+            rows.append({
+                'id_ricovero': id_ricovero,
+                'codice_struttura_erogante': codice_ospedale,
+                'distanza_km': distanza
+            })
+
+    distance_df = pd.DataFrame(rows)
+    return distance_df
+
+
+if __name__ == "__main__":
+
+    main()
