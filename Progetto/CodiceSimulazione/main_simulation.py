@@ -5,11 +5,8 @@ Created on Tue Jan  5 12:57:59 2021
 
 @author: stevi
 """
-import cProfile
 import datetime
-import io
 import logging
-import pstats
 import time
 
 import pandas as pd
@@ -29,133 +26,169 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     """
     Inizio simulazione.
 
-    Come output della simulazione ci saranno 3 file .txt che raccoglieranno
-    tutte le info necessarie per l'analisi della simulazione.
-
     Parameters
     ----------
-    hospitalization_dataframe : Dataframe
-        Dataframe con info sui pazienti da simulare.
-    hosp_dict : Dizionario
-        Dizionario creato dai file csv contenente le info degli ospedali.
-
-    Returns
-    -------
-    None.
-
+    hospitalization_dataframe : DataFrame
+    hosp_dict : dict
+    resources_to_remove : list
+    policy_resources : list
+    solver : str
+    time_limit : int
+    name : str
     """
-    print(
-        f"Risorse da rimuovere -> ospedali interi: {len(resources_to_remove[0])}; specialità {len(resources_to_remove[1])}; data {resources_to_remove[2]}")
-    start = time.time()
+    logging.info(f"Inizio esecuzione start_simulation()")
+    start_time_total = time.perf_counter()
 
-    # Creo una lista di dataframe, ogni dataframe contiene tutti i pazienti
-    # ricoverati lo stesso giorno
+    # --- Informazioni sulle risorse da rimuovere ---
+    logging.info(f"Risorse da rimuovere: {len(resources_to_remove[0])} ospedali, {len(resources_to_remove[1])} specialità, a partire da data: {resources_to_remove[2]}")
+
+    # --- Creazione hospitalization_day_list ---
+    t0 = time.perf_counter()
     gb = hospitalization_dataframe.groupby('data_ricovero')
     hospitalization_day_list = [gb.get_group(x) for x in gb.groups]
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Creazione hospitalization_day_list completata in {elapsed:.2f} secondi (totale giorni: {len(hospitalization_day_list)})")
 
-    # Mi salvo il primo anno che incontro
+    # --- Anno iniziale della simulazione ---
     first_date = hospitalization_day_list[0]['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
     previous_year_simulation = pd.to_datetime(first_date).year
+    logging.info(f"Anno iniziale della simulazione: {previous_year_simulation}")
 
-    # Creo la lista degli oggetti ospedale specialità
+    # --- Creazione oggetti ospedale-specialità ---
+    t0 = time.perf_counter()
     hosp_spec_list_object = uf.create_hospital_specialty_list_from_year(hosp_dict, previous_year_simulation)
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Creazione hosp_spec_list_object completata in {elapsed:.2f} secondi")
 
-    print("Totale giorni: " + str(len(hospitalization_day_list)))
-
-    # Variabili Simulazione.
-    # giorni di attesa prima che il sistema arrivi ad una condizione di
-    # equilibrio (con 0 o len(hospitalization_day_list) non attivo la parte di anticipare i pazienti)
+    # --- Parametri di simulazione ---
     spurious_days = 0
-    # quantità di giorni da controllare per anticipare pazienti. Utilizzato se attivo spurious_days
     forward_days = 0
-    # percentuale di riduzione della capacità giornaliera
     daily_percentage_reduction_capacity = 0
-    # soglia dalla quale applicare la riduzione percentuale daily_percentage_reduction_capacity
     capacity_threshold = 13
-    # flag di blocco del riassegnamento greedy. Mettere False per usare l'ottimizzatore
     is_optimizer_off = False
-    # modello da utilizzare per l'ottimizzatore
     optimizer_model_type = oc.OptimizerModelType.NORM_INF
-    # flag per rimuovere le risorse solo una volta. Mettere a False se l'ottimizzatore è attivo
-    flg_alt_remove = False
+    already_removed_resources = False
 
-    # Creo i file di log
+    logging.info(f"Parametri simulazione: spurious_days={spurious_days}, forward_days={forward_days}, "
+                 f"daily_reduction={daily_percentage_reduction_capacity}, threshold={capacity_threshold}, "
+                 f"optimizer_off={is_optimizer_off}")
+
+    # --- Creazione file di log iniziali ---
+    t0 = time.perf_counter()
     save_info.create_day_log(hospitalization_day_list, hosp_spec_list_object, spurious_days, name)
-
     save_info.create_queue_info(name)
-
     save_info.create_anticipated_queue(name)
+    elapsed = time.perf_counter() - t0
+    logging.info(f"Creazione file di log iniziali completata in {elapsed:.2f} secondi")
 
-    # Conto quanti pazienti ci sono
+    # --- Conteggio totale pazienti ---
     hospitalization_count = uf.count_total_patient(hospitalization_day_list)
-    print("Totale ricoveri: " + str(hospitalization_count))
+    logging.info(f"Totale ricoveri da simulare: {hospitalization_count}")
 
-    # Contatore dei giorni, non modificare
+    # --- Inizio ciclo simulazione giornaliera ---
     simulation_day_index = 0
-
-    # lista comuni che dovrebbero avere un ospedale ma che non lo hanno nel file distanzeComuniOspedali.csv
     lista_comuni_mancanti = []
 
-    # Inizio della simulazione
-    start_time_simulation = time.time()
-    print("INIZIO SIMULAZIONE", start_time_simulation)
+    start_time_simulation = time.perf_counter()
+    logging.info(f"Inizio simulazione giornaliera")
     for hospitalization_day_dataframe in hospitalization_day_list:
+        # --- Logging inizio giorno ---
+        current_date_simulation = hospitalization_day_dataframe['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
+        current_year_simulation = pd.to_datetime(current_date_simulation).year
+        logging.info(
+            f"Giorno {simulation_day_index} - Data: {current_date_simulation} (Anno: {current_year_simulation}) - Inizio elaborazione")
+
+        # --- Ottengo giorno della settimana (lunedì=0, domenica=6) ---
+        day_of_the_week_number = uf.number_of_the_day(current_date_simulation)
+        logging.info(f"Giorno della settimana: {day_of_the_week_number} (0=Lunedì, ..., 6=Domenica)")
         queue_info = []
         # lista che contiene gli oggetti Patient che vengono anticipati
         list_anticipated_patients = []
-        print("Giorno: " + str(simulation_day_index))
-
-        current_date_simulation = hospitalization_day_dataframe['data_ricovero'].iloc[0].strftime("%Y-%m-%d")
-        current_year_simulation = pd.to_datetime(current_date_simulation).year
-        print(f"current_date_simulation: {current_date_simulation}")
-
-        # Ottengo il numero del giorno della settimana(lunedì=0, martedì=1, ecc...)
-        day_of_the_week_number = uf.number_of_the_day(current_date_simulation)
-
         # Se è cambiato l'anno riaggiorno tutte le capacità e ricopio le vecchie code
+        # --- Controllo cambio anno e aggiorno ospedali ---
         if current_year_simulation != previous_year_simulation:
-            print("Nuovo anno per cui rimuovo le risorse")
+            logging.info(f"Cambio anno rilevato: da {previous_year_simulation} a {current_year_simulation}")
+
+            t0 = time.perf_counter()
             new_hosp_list = uf.create_hospital_specialty_list_from_year(hosp_dict, current_year_simulation)
             hosp_spec_list_object = uf.update_hospital_capacity(hosp_spec_list_object, new_hosp_list)
-            print(f"Prima della rimozione risorse: {len(hosp_spec_list_object)} specialità")
-            hosp_spec_list_object = rr.remove_resources(hosp_spec_list_object, resources_to_remove)
-            print(f"Dopo la rimozione risorse: {len(hosp_spec_list_object)} specialità")
+            elapsed = time.perf_counter() - t0
+            logging.info(f"Aggiornamento capacità ospedali completato in {elapsed:.2f} secondi")
+
             previous_year_simulation = current_year_simulation
-            # Riassegno i pazienti che non hanno l'ospedale
-            # remaining_days_to_sunday sta per i giorni mancanti alla prossima domenica
+
+            logging.info(f"Avvio rimozione risorse per il nuovo anno")
+            t0 = time.perf_counter()
+            hosp_spec_list_object = rr.remove_resources(hosp_spec_list_object, resources_to_remove)
+            elapsed = time.perf_counter() - t0
+            logging.info(
+                f"Rimozione risorse completata in {elapsed:.2f} secondi (Specialità rimanenti: {len(hosp_spec_list_object)})")
+
+            # --- Riassegnazione anticipata dei pazienti ---
             remaining_days_to_sunday = 7 - day_of_the_week_number
             upper_threshold_simulation_day_index = simulation_day_index + remaining_days_to_sunday
             if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                 upper_threshold_simulation_day_index = len(hospitalization_day_list)
-            print(f'upper_threshold_simulation_day_index: {upper_threshold_simulation_day_index}')
-            new_anticipated_days, time_optimization = rh.optimization_reassing(simulation_day_index,
-                                                                               upper_threshold_simulation_day_index,
-                                                                               hospitalization_day_list,
-                                                                               resources_to_remove[0],
-                                                                               resources_to_remove[1],
-                                                                               hosp_spec_list_object,
-                                                                               policy_resources[0],
-                                                                               policy_resources[1], policy_resources[2],
-                                                                               solver, time_limit,
-                                                                               optimizer_model_type)
-            print(f'Ottimizzazione durata: {time_optimization} secondi')
+
+            logging.info(
+                f"Riassegnazione anticipata pazienti da giorno {simulation_day_index} a {upper_threshold_simulation_day_index}")
+
+            new_anticipated_days, time_optimization = rh.optimization_reassing(
+                simulation_day_index,
+                upper_threshold_simulation_day_index,
+                hospitalization_day_list,
+                resources_to_remove[0],
+                resources_to_remove[1],
+                hosp_spec_list_object,
+                policy_resources[0],
+                policy_resources[1],
+                solver,
+                time_limit,
+                optimizer_model_type
+            )
             hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
+
+            logging.info(f"Riassegnazione pazienti completata in {time_optimization:.2f} secondi")
 
         # Controllo se c'è da rimuovere delle risorse. La rimozione avviene o se si è superata la data passata
         # dal file o se l'ottimizzatore è attivo. Questo perché l'ottimizzatore parte dalla prima domenica 
         # possibile
 
+        # --- Controllo se è il momento di rimuovere risorse e ottimizzare ---
         if (current_date_simulation == str(resources_to_remove[2][0])) or (not is_optimizer_off):
-            if not flg_alt_remove:
-                print(f"Prima della rimozione risorse: {len(hosp_spec_list_object)} specialità")
+            if not already_removed_resources:
+                logging.info(
+                    f"Giorno {simulation_day_index} ({current_date_simulation}): avvio procedura di rimozione risorse straordinarie")
+
+                # Misuro tempo rimozione risorse
+                t0 = time.perf_counter()
+
+                initial_specialties = len(hosp_spec_list_object)
                 hosp_spec_list_object = rr.remove_resources(hosp_spec_list_object, resources_to_remove)
-                print(f"Dopo la rimozione risorse: {len(hosp_spec_list_object)} specialità")
-                flg_alt_remove = True
-                # Riassegno i pazienti che non hanno l'ospedale
+                final_specialties = len(hosp_spec_list_object)
+
+                elapsed = time.perf_counter() - t0
+                logging.info(
+                    f"Rimozione risorse completata in {elapsed:.2f} secondi (Specialità prima: {initial_specialties}, dopo: {final_specialties})")
+
+                # Flag per evitare ulteriori rimozioni future
+                already_removed_resources = True
+
+                # --- Riassegnazione pazienti (ottimizzazione immediata) ---
+                logging.info(f"Avvio ottimizzazione anticipata dei pazienti a seguito della rimozione risorse")
+
+                # Calcolo finestra di giorni da ottimizzare (fino a domenica)
                 remaining_days_to_sunday = 7 - day_of_the_week_number
-                upper_threshold_simulation_day_index = simulation_day_index + remaining_days_to_sunday  # remaining_days_to_sunday sta per i giorni mancanti alla prossima domenica
+                upper_threshold_simulation_day_index = simulation_day_index + remaining_days_to_sunday
                 if upper_threshold_simulation_day_index > len(hospitalization_day_list):
                     upper_threshold_simulation_day_index = len(hospitalization_day_list)
+
+                logging.info(
+                    f"Finestra di riassegnazione: da giorno {simulation_day_index} a {upper_threshold_simulation_day_index}")
+
+                # Misuro tempo ottimizzazione
+                t0 = time.perf_counter()
+
                 new_anticipated_days, time_optimization = rh.optimization_reassing(
                     simulation_day_index=simulation_day_index,
                     upper_threshold_simulation_day_index=upper_threshold_simulation_day_index,
@@ -167,8 +200,14 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                     dict_distances_between_com=policy_resources[1],
                     solver=solver,
                     time_limit=time_limit,
-                    optimizer_model_type=optimizer_model_type)
-                print(f"Ottimizzazione durata: {time_optimization} secondi")
+                    optimizer_model_type=optimizer_model_type
+                )
+
+                elapsed = time.perf_counter() - t0
+                logging.info(
+                    f"Ottimizzazione anticipata completata in {elapsed:.2f} secondi (tempo ottimizzatore: {time_optimization:.2f} secondi)")
+
+                # Aggiorno hospitalization_day_list con i pazienti riassegnati
                 hospitalization_day_list[
                 simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
         # Decremento i giorni di degenza dei pazienti nelle varie specialità h, poi levo i pazienti a 0 giorni di
@@ -398,16 +437,16 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 # Setup logging
 def setup_logging():
     logger = logging.getLogger()
+    if logger.hasHandlers():
+        logger.handlers.clear()  # 🔥 Pulisce eventuali handler già aggiunti
     logger.setLevel(logging.INFO)
 
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 
-    # Handler per il file
     file_handler = logging.FileHandler("simulation.log", mode='w')
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 
-    # Handler per la console
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
@@ -482,15 +521,7 @@ def main():
     elapsed = time.perf_counter() - t0
     logging.info(f"Calcolo distanza vecchio ospedale completato in {elapsed:.2f} secondi.")
 
-    # --- Calcolo matrice distanza ---
-    t0 = time.perf_counter()
-    distance_df = generate_distance_matrix(
-        hospitalizations=hospitalizations,
-        mapping_hosp_comuni_path="../RawData/mapping_hosp_comuni.csv",
-        dict_distances_between_com=dict_distances_between_com
-    )
-    elapsed = time.perf_counter() - t0
-    logging.info(f"Calcolo matrice distanza completato in {elapsed:.2f} secondi.")
+
     # --- Avvio simulazione ---
     t0 = time.perf_counter()
     start_simulation(
@@ -508,35 +539,6 @@ def main():
     # --- Fine esecuzione ---
     total_elapsed = time.perf_counter() - start_time_total
     logging.info(f"Esecuzione main() completata in {total_elapsed:.2f} secondi.")
-
-
-def generate_distance_matrix(hospitalizations, mapping_hosp_comuni_path, dict_distances_between_com):
-    # Carica la lista ospedali
-    hospitals_df = pd.read_csv(mapping_hosp_comuni_path, dtype={"codice_struttura_erogante": "string", "id_comune_struttura_erogante": "string"})
-
-    rows = []
-
-    for patient in hospitalizations.itertuples():
-        id_ricovero = patient.Index
-        id_comune_paziente = patient.id_comune_paziente
-
-        for hospital in hospitals_df.itertuples(index=False):
-            codice_ospedale = hospital.codice_struttura_erogante
-            id_comune_ospedale = hospital.id_comune_struttura_erogante
-
-            if id_comune_paziente == id_comune_ospedale:
-                distanza = 0
-            else:
-                distanza = dict_distances_between_com.get(id_comune_paziente, {}).get(id_comune_ospedale, DEFAULT_DISTANCE)
-
-            rows.append({
-                'id_ricovero': id_ricovero,
-                'codice_struttura_erogante': codice_ospedale,
-                'distanza_km': distanza
-            })
-
-    distance_df = pd.DataFrame(rows)
-    return distance_df
 
 
 if __name__ == "__main__":

@@ -33,25 +33,52 @@ def read_input(file_txt):
 
     return hosp_id_list, hosp_spec_list, date
 
+import logging
+import time
+
 def remove_resources(hosp_list, resources_to_remove):
-    """Ho la lista degli ospedali e devo rimuovere quelli nel file
+    """
+    Rimuove specialità ospedaliere dalla lista di oggetti ospedale-specialità.
 
     Args:
-        hosp_list (dizionario): dizionario degli ospedali
+        hosp_list (list): lista di oggetti Ospedale-Specialità
+        resources_to_remove (list): [lista id ospedali da rimuovere, lista id specialità da rimuovere]
 
     Returns:
-        dizionario: dizionario degli ospedali con gli ospedali rimossi
+        list: nuova lista filtrata
     """
-    remove_hosp_id_list = resources_to_remove[0]
-    remove_hosp_spec_list = resources_to_remove[1]
-    if remove_hosp_id_list != '':
-        hosp_list = [h for h in hosp_list if int(h.id_hosp) not in remove_hosp_id_list]
-    if remove_hosp_spec_list != '':
-        hosp_list = [h for h in hosp_list if [int(h.id_hosp), int(h.id_spec)] not in remove_hosp_spec_list]
+
+    logging.info(f"Inizio rimozione risorse: specialità iniziali {len(hosp_list)}")
+
+    start_time = time.perf_counter()
+
+    remove_hosp_id_list = resources_to_remove[0] or []
+    remove_spec_id_list = resources_to_remove[1] or []
+
+    remove_hosp_id_set = set(remove_hosp_id_list)
+    remove_spec_id_set = set(remove_spec_id_list)
+
+    # --- Rimozione specialità per ID ospedale ---
+    if remove_hosp_id_set:
+        before_len = len(hosp_list)
+        hosp_list = [h for h in hosp_list if int(h.id_hosp) not in remove_hosp_id_set]
+        after_len = len(hosp_list)
+        removed = before_len - after_len
+        logging.info(f"Specialità rimosse eliminando ospedali: {removed} specialità (prima: {before_len}, dopo: {after_len})")
+
+    # --- Rimozione specialità per ID specialità ---
+    if remove_spec_id_set:
+        before_len = len(hosp_list)
+        hosp_list = [h for h in hosp_list if int(h.id_spec) not in remove_spec_id_set]
+        after_len = len(hosp_list)
+        removed = before_len - after_len
+        logging.info(f"Specialità rimosse eliminando codici specialità: {removed} specialità (prima: {before_len}, dopo: {after_len})")
+
+    elapsed = time.perf_counter() - start_time
+    logging.info(f"Completata rimozione risorse in {elapsed:.2f} secondi (specialità finali: {len(hosp_list)})")
 
     return hosp_list
 
-#----------------------------------------------------------------------------------------------------#
 
 def __nearest_hospital(patient_id_hosp, patient_id_spec, remove_hosp_id_list, hosp_list, lista_comuni_mancanti,
                        policy_resources):
