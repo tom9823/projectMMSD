@@ -33,53 +33,47 @@ def unpack_spec(spec_dict):
 
 def initialize_hospitals(risorse):
     """
-    Creo un dizionario di dizionari di ospedali.
-
-    Chiave principale "id ospedale", seconda chiave "anno" con valore un
-    dizionario con: chiave codice specialità, valore una lista delle capacità
-    [capacità giornaliera (7 valori), capacità massima]).
-
-    Il dizionario è:{'id ospedale':'anno':{'codice specialità':
-    ['MONDAY','TUESDAY','WEDNESDAY','THURSDAY','FRIDAY','SATURDAY','SUNDAY',
-     'capacita_max']}}
+    Restituisce un dizionario:
+      { '01000300': { 2011: { '09': [...], '34': [...], … }, 2012: {…}, … },
+        '01000802': { … }, … }
+    (i prefissi 'res_' e 'spec_' sono automaticamente rimossi)
     """
-    # Ottengo la lista dei codici ospedali senza duplicati
+    # estrai serie ospedali/anni
     hosp_series = risorse['codice_struttura_erogante'].drop_duplicates()
-    # Ottengo la lista degli anni senza duplicati
     year_series = risorse['year'].drop_duplicates()
-    filename = '../DatiElaborati/hosp_series'
-    joblib.dump(hosp_series, filename)
-    print('Creazione file', filename)
-    filename = '../DatiElaborati/year_series'
-    joblib.dump(year_series, filename)
-    print('Creazione file', filename)
-    final_dict = {}
-    print('Inizio creazione dizionario ospedali')
-    for index, val in hosp_series.items():
-        tmp_dict = {}
-        for y in year_series:
-            y_dict = {}
-            for index, row in risorse.iterrows():
-                if val == row['codice_struttura_erogante']:
-                    if y == row['year']:
-                        y_dict[row['codici_specialita']] = [row['MONDAY'],
-                                                            row['TUESDAY'],
-                                                            row['WEDNESDAY'],
-                                                            row['THURSDAY'],
-                                                            row['FRIDAY'],
-                                                            row['SATURDAY'],
-                                                            row['SUNDAY'],
-                                                            row['capacita_max']]
-            tmp_dict[y] = y_dict
-        final_dict[val] = tmp_dict
-    #codice struttura erogante punta ad anno il quale punta a codici_specialita il quale punta alle diverse info
-    print(f'Lunghezza indice: {index}')
-    print('Fine creazione dizionario ospedali')
-    filename = '../DatiElaborati/hosp_dict_resources'
-    joblib.dump(final_dict, filename)
-    print('Creato file', filename)
-    return final_dict
 
+    final_dict = {}
+    for raw_hosp_code in hosp_series:
+        # 1) rimuovi eventuale prefisso "res_"
+        if raw_hosp_code.startswith("res_"):
+            hosp_code = raw_hosp_code[len("res_"):]
+        else:
+            hosp_code = raw_hosp_code
+
+        per_year = {}
+        for y in year_series:
+            spec_map = {}
+            # per ogni riga che corrisponde a (hosp, year)
+            subset = risorse[
+                (risorse['codice_struttura_erogante'] == raw_hosp_code) &
+                (risorse['year'] == y)
+            ]
+            for _, row in subset.iterrows():
+                raw_spec = row['codici_specialita']
+                # 2) rimuovi eventuale prefisso "spec_"
+                spec_key = raw_spec[len("spec_"):] if raw_spec.startswith("spec_") else raw_spec
+
+                spec_map[spec_key] = [
+                    row['MONDAY'], row['TUESDAY'], row['WEDNESDAY'],
+                    row['THURSDAY'], row['FRIDAY'], row['SATURDAY'],
+                    row['SUNDAY'], row['capacita_max']
+                ]
+
+            per_year[y] = spec_map
+
+        final_dict[hosp_code] = per_year
+
+    return final_dict
 
 def __risorse_idspec_parser(s):
     tmp_id_spec = str(s).split("_")[1]

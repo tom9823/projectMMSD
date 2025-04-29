@@ -19,19 +19,44 @@ def __find_distance(id_com_hospitalization, id_hosp, map_hospital_comune, dict_d
     dis = dict_distances.get(str(id_com_hospitalization), {}).get(id_com_hosp, DEFAULT_DISTANCE)
     return int(dis)
 
-def calc_pat_to_reassign(hospitalization_day_dataframe_list, hosp_id_list, hosp_spec_id_list):
-    # Creo la lista dei pazienti che devono essere riassegnati
-    patient_to_reassign_dict = {}
-    for next_day in hospitalization_day_dataframe_list:
-        for index, hospitalization in next_day.iterrows():
-            patient_id_hosp = hospitalization.loc['codice_struttura_erogante']
-            patient_id_spec = hospitalization.loc['cod_branca_ammissione']
+def calc_pat_to_reassign(hosp_day_df_list, hosp_id_list, hosp_spec_id_list):
+    """
+    Restituisce i ricoveri da riassegnare perché l’ospedale
+    o la specialità del ricovero è in lista di chiusura.
 
-            if (int(patient_id_hosp) in hosp_id_list) or (int(patient_id_spec) in hosp_spec_id_list):
-                patient_to_reassign_dict[index] = hospitalization
+    Parameters
+    ----------
+    hosp_day_df_list : list[pd.DataFrame]
+        Lista di DataFrame giornalieri.
+    hosp_id_list : list[int]
+        ID ospedali da chiudere.
+    hosp_spec_id_list : list[int]
+        ID specialità da chiudere.
 
-        # Concatena tutti i DataFrame presenti nella lista senza ignorare l'indice
-    return pd.DataFrame.from_dict(patient_to_reassign_dict, orient='index')
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame filtrato dei soli pazienti da riassegnare,
+        con l’indice originale (id_ricovero).
+    """
+    if not hosp_day_df_list:            # lista vuota → ritorna DF vuoto
+        return pd.DataFrame()
+
+    # 1) Concatena tutti i giorni in un unico DataFrame
+    df_all = pd.concat(hosp_day_df_list, axis=0)
+
+    # 2) Trasforma le liste in set per lookup O(1)
+    hosp_id_set = set(map(int, hosp_id_list))
+    spec_id_set = set(map(int, hosp_spec_id_list))
+
+    # 3) Applica la maschera booleana in modo vettoriale
+    mask = (
+        df_all["codice_struttura_erogante"].astype(int).isin(hosp_id_set) |
+        df_all["cod_branca_ammissione"].astype(int).isin(spec_id_set)
+    )
+
+    # 4) Filtra (senza fare sort) e restituisce copia
+    return df_all.loc[mask].copy()
 
 
 def rest_days(patient_to_reassign):
@@ -42,18 +67,19 @@ def list_pat(patient_to_reassign):
     return {None: [int(index) for index in patient_to_reassign.index]}
 
 
-def __hosp_spec_list(hosp_lists, spec):
+def build_hospital_set_for_specialty(hosp_lists, spec):
     tmp_hosp = [h.id_hosp for h in hosp_lists if h.id_spec == spec]
     return {None: tmp_hosp}, tmp_hosp
 
 
-def all_distance(hospitalization_to_reassign, specialty_closed_list_string, hosp_list, spec, map_hospital_comune, dict_distances):
-    return {
-        (int(hospitalization.name), h.id_hosp): __find_distance(hospitalization['id_comune_paziente'], h.id_hosp, map_hospital_comune, dict_distances)
-        for hospitalization in hospitalization_to_reassign.itertuples()
-        for h in hosp_list
-        if h.id_spec == spec and h.id_hosp in specialty_closed_list_string
-    }
+def all_distance(hospitalization_to_reassign, hospital_specialty_closed_list_string, hosp_list, specialty, map_hospital_comune, dict_distances):
+        ret = dict()
+        for hospitalization in hospitalization_to_reassign.itertuples():
+            id_ricovero = hospitalization.Index
+            dict_ricovero = dict()
+            for hosp_spec in [h_s for h_s in hosp_list if (h_s.id_hosp not in hospital_specialty_closed_list_string and h_s.id_spec == specialty)]:
+                dict_ricovero[hosp_spec] = __find_distance(hospitalization.id_comune_paziente, hospitalization.codice_struttura_erogante, map_hospital_comune, dict_distances)
+            ret[id_ricovero] = dict_ricovero
 
 
 def calculate_gamma(l, H, hosp_list, spec, alfa):
@@ -132,11 +158,11 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
 
         for spec_counter, hospitalization_by_spec_dataframe in enumerate(hospitalization_by_spec_dataframe_list, start=1):
             current_spec_id = hospitalization_by_spec_dataframe['cod_branca_ammissione'].iloc[0]
-            logging.info(f"[Specialità {current_spec_id}] Ottimizzazione avviata con {len(hospitalization_by_spec_dataframe)} pazienti.")
+            logging.info(f"[Specialità {current_spec_id}] Ottimizzazione avviata con {len(hospitalization_by_spec_dataframe)} pazienti da riassegnare.")
 
             l = rest_days(hospitalization_by_spec_dataframe)
             p = list_pat(hospitalization_by_spec_dataframe)
-            H, hospital_specialty_closed_list_string = __hosp_spec_list(hosp_spec_list_object, current_spec_id)
+            H, hospital_specialty_closed_list_string = build_hospital_set_for_specialty(hosp_spec_list_object, current_spec_id)
 
             m = dict(zip(hospitalization_by_spec_dataframe.index.astype(int),
                          hospitalization_by_spec_dataframe['distanza_vecchio_ospedale']))
