@@ -21,8 +21,7 @@ import reassing_hospital as rh
 DEFAULT_DISTANCE = 50000  # distanza in m se non si trova la corrispondenza
 
 
-def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit,
-                     name):
+def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit, name):
     """
     Inizio simulazione.
 
@@ -66,7 +65,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     daily_percentage_reduction_capacity = 0
     capacity_threshold = 13
     is_optimizer_off = False
-    optimizer_model_type = oc.OptimizerModelType.NORM_INF
+    optimizer_model_type = oc.OptimizerModelType.NORM_1
     already_removed_resources = False
 
     logging.info(f"Parametri simulazione: spurious_days={spurious_days}, forward_days={forward_days}, "
@@ -208,8 +207,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                     f"Ottimizzazione anticipata completata in {elapsed:.2f} secondi (tempo ottimizzatore: {time_optimization:.2f} secondi)")
 
                 # Aggiorno hospitalization_day_list con i pazienti riassegnati
-                hospitalization_day_list[
-                simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
+                hospitalization_day_list[simulation_day_index:upper_threshold_simulation_day_index] = new_anticipated_days
         # Decremento i giorni di degenza dei pazienti nelle varie specialità h, poi levo i pazienti a 0 giorni di
         # degenza.
         for h in hosp_spec_list_object:
@@ -233,6 +231,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                         )
                         p.patient_true_day_recovery = current_date_simulation
                         queue_info.append([p, h])
+
         # Controllo se posso ricoverare i nuovi pazienti che non sono nelle liste di attesa della specialità
         for index, hospitalization_record in hospitalization_day_dataframe.iterrows():
             # Leggo e salvo le info del paziente
@@ -260,6 +259,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                                hospitalization_record_id_hosp,
                                                                                                hospitalization_record_id_spec)
 
+
             hospitalization_record_rest_time = int(hospitalization_record.loc['giorni_degenza'])
 
             hospitalization_record_recovery_date = hospitalization_record['data_ricovero'].strftime("%Y-%m-%d")
@@ -273,8 +273,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
 
             # ottengo le due capacità
             hosp_spec_max_beds_capacity = int(hospitalization_record_hospital_specialty_object.capacity[7])
-            hosp_spec_day_capacity = int(
-                hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
+            hosp_spec_day_capacity = int(hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
             # ci sono casi in cui la capacità giornaliera è 0, non li considero
             if hosp_spec_day_capacity != 0:
                 # diminuisco di una percentuale arrotondando per difetto con
@@ -529,7 +528,7 @@ def main():
         hosp_dict=hosp_dict,
         resources_to_remove=[hosp_id_list, hosp_spec_list, date],
         policy_resources=[dict_mapping_hospital_com, dict_distances_between_com, dict_mapping_com_hospital],
-        solver="glpk",
+        solver="cplex",
         time_limit=10,
         name=name
     )

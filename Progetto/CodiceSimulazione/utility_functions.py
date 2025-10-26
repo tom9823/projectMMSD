@@ -26,17 +26,19 @@ def get_hospitalization_hospital(hosp_object_list, hospitalization_record_id_hos
 
     """
     try:
-        target_hospital = 'None'
+        target_hospital = None
         for h in hosp_object_list:
             if int(h.id_hosp) == int(hospitalization_record_id_hosp):
                 if int(h.id_spec) == int(hospitalization_record_id_spec):
                     target_hospital = h
-        if target_hospital == 'None':
+        if target_hospital is None:
             for h in hosp_object_list:
                 if int(h.id_spec) == int(hospitalization_record_id_spec):
                     target_hospital = h
     except TypeError:
         print("Invalid integer value",hospitalization_record_id_spec, h.id_spec)
+    if target_hospital is None:
+        print("!|^!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     return target_hospital
 
 

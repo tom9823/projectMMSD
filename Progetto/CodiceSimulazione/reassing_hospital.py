@@ -17,7 +17,7 @@ def __find_distance(id_com_hospitalization, id_hosp, map_hospital_comune, dict_d
     if id_com_hosp == id_com_hospitalization:
         return 0
     dis = dict_distances.get(str(id_com_hospitalization), {}).get(id_com_hosp, DEFAULT_DISTANCE)
-    return int(dis)
+    return dis
 
 def calc_pat_to_reassign(hosp_day_df_list, hosp_id_list, hosp_spec_id_list):
     """
@@ -68,19 +68,15 @@ def list_pat(patient_to_reassign):
 
 
 def build_hospital_set_for_specialty(hosp_lists, spec):
-    tmp_hosp = [h.id_hosp for h in hosp_lists if h.id_spec == spec]
+    tmp_hosp = [int(h.id_hosp) for h in hosp_lists if h.id_spec == spec]
     return {None: tmp_hosp}, tmp_hosp
 
 
-def all_distance(hospitalization_to_reassign, hospital_closed_id_list, specialty_closed_id_list, hosp_list, specialty, map_hospital_comune):
+def all_distance(hospitalization_to_reassign, hospital_closed_id_list, specialty_closed_id_list, hosp_list, specialty, map_hospital_comune, dict_distances_between_com):
     dict_distances = dict()
     for hospitalization in hospitalization_to_reassign.itertuples():
-        id_ricovero = hospitalization.Index
-        dict_ricovero = dict()
-        for hosp_spec in [h_s for h_s in hosp_list if (h_s.id_hosp not in hospital_closed_id_list and h_s.id_spec == specialty and h_s.id_spec not in specialty_closed_id_list)]:
-            dict_ricovero[hosp_spec] = __find_distance(hospitalization.id_comune_paziente, hospitalization.codice_struttura_erogante, map_hospital_comune, dict_distances)
-        if not dict_ricovero:
-            dict_distances[id_ricovero] = dict_ricovero
+        for h_s in [h for h in hosp_list if h.id_hosp not in hospital_closed_id_list and h.id_spec == specialty and h.id_spec not in specialty_closed_id_list]:
+            dict_distances[int(hospitalization.Index), int(h_s.id_hosp)] = __find_distance(hospitalization.id_comune_paziente, hospitalization.codice_struttura_erogante, map_hospital_comune, dict_distances_between_com)
     return dict_distances
 
 
@@ -102,7 +98,7 @@ def calculate_gamma(l, H, hosp_list, spec, alfa):
     for h in tmp_h:
         f1 = 0
         for i in hosp_list:
-            if h == i.id_hosp and spec == i.id_spec:
+            if h == int(i.id_hosp) and spec == i.id_spec:
                 f1 = i.capacity[7]  # prendo la capacità massima
         #f è il rapporto tra capacità massima del singolo ospedale per specialità e capacità massima di tutti gli ospedali per specialità
         f = f1 / f_tot  # Ora non si può più dividere per zero
@@ -123,6 +119,19 @@ def create_data(l, p, H, m, d, gamma):
     tmp_d.update({'d': d})
     tmp_d.update({'gamma': gamma})
     data.update({None: tmp_d})
+
+    # print("p:")
+    # print(p)
+    # print("l:")
+    # print(l)
+    # print("H:")
+    # print(H)
+    # print("m:")
+    # print(m)
+    # print("d:")
+    # print(d)
+    # print("gamma:")
+    # print(gamma)
     return data
 
 
@@ -139,8 +148,10 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
     d = dict()
     m = dict()
 
-    hospitalization_day_to_reassign_dataframe_list = hospitalization_day_list_dataframe[
-        simulation_day_index:upper_threshold_simulation_day_index]
+    hospitalization_day_to_reassign_dataframe_list = [
+        df.copy(deep=True)
+        for df in hospitalization_day_list_dataframe[simulation_day_index:upper_threshold_simulation_day_index]
+    ]
 
     hospitalization_to_reassign_dataframe_compat = calc_pat_to_reassign(
         hospitalization_day_to_reassign_dataframe_list, closing_hosp_id_list, closing_spec_id_list)
@@ -149,7 +160,6 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
     logging.info(f"Giorni selezionati: {len(hospitalization_day_to_reassign_dataframe_list)}, Ricoveri da riassegnare: {total_patients}")
 
     if not hospitalization_to_reassign_dataframe_compat.empty:
-
         hospitalization_by_spec_dataframe_list = [
             hospitalization_to_reassign_dataframe_compat[
                 hospitalization_to_reassign_dataframe_compat['cod_branca_ammissione'] == valore
@@ -166,18 +176,19 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
             p = list_pat(hospitalization_by_spec_dataframe)
             H, hospital_for_specialty_id_list = build_hospital_set_for_specialty(hosp_spec_object_list, current_spec_id)
 
-            m = dict(zip(hospitalization_by_spec_dataframe.index,
-                         hospitalization_by_spec_dataframe['distanza_vecchio_ospedale']))
+            m = dict(zip(hospitalization_by_spec_dataframe.index.astype(int), hospitalization_by_spec_dataframe['distanza_vecchio_ospedale']))
 
             d = all_distance(hospitalization_by_spec_dataframe,
                              closing_hosp_id_list,
                              closing_spec_id_list,
                              hosp_spec_object_list,
                              current_spec_id,
-                             dict_mapping_hospital_com)
+                             dict_mapping_hospital_com,
+                             dict_distances_between_com)
 
             alfa = 0.5
             gamma = calculate_gamma(l, H, hosp_spec_object_list, current_spec_id, alfa)
+
             data = create_data(l, p, H, m, d, gamma)
 
             logging.info(f"Parametri del modello per specialità {current_spec_id}:\n"
@@ -189,14 +200,15 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
                          f"- gamma (capacità ponderata ospedali): {len(gamma)} elementi\n")
 
             logging.info(f"Costruzione modello per specialità {current_spec_id} completata. Inizio risoluzione...")
-            if not d:
+
+            if d:
                 results, model = oms.create_model(data, solver, time_limit, optimizer_model_type)
 
                 infeasible_attempts = 0
                 while results.solver.termination_condition == TerminationCondition.infeasible:
                     alfa += 0.5
                     infeasible_attempts += 1
-                    logging.warning(f"Problema infeasible per specialità {current_spec_id}. Incremento parametro α={alfa}.")
+                    logging.warning(f"Problema infeasible per specialità {current_spec_id}. Incremento parametro alfa={alfa}.")
                     gamma = calculate_gamma(l, H, hosp_spec_object_list, current_spec_id, alfa)
                     data = create_data(l, p, H, m, d, gamma)
                     results, model = oms.create_model(data, solver, time_limit, optimizer_model_type)
@@ -204,21 +216,21 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
                 logging.info(f"Modello specialità {current_spec_id} risolto con successo. Tentativi infeasibili: {infeasible_attempts}.")
 
                 for tupla_x in model.x:
-                    if model.x[(tupla_x[0], tupla_x[1])].value == 1:
+                    if model.x[tupla_x].value > 0.5:
                         new_list_hosp.append(tupla_x)
+
+                for t in new_list_hosp:
+                    for i in range(0, len(hospitalization_day_to_reassign_dataframe_list)):
+                        if str(t[0]) in hospitalization_day_to_reassign_dataframe_list[i].index:
+                            dist_old_hospital = m.get(t[0], 0)
+                            dist_new_hospital = d.get((t[0], t[1]), DEFAULT_DISTANCE)
+
+                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'codice_struttura_erogante_nuova'] = f"0{t[1]}"
+                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'distanza_vecchio_ospedale'] = dist_old_hospital
+                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'distanza_nuovo_ospedale'] = dist_new_hospital
+                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'discomfort'] = max(0, dist_new_hospital - dist_old_hospital)
             else:
                 logging.info(f"Non sono presenti ospedali possibili per la specialità corrente: {current_spec_id}.")
-
-        for t in new_list_hosp:
-            for hospitalization_day_to_reassign_dataframe in hospitalization_day_to_reassign_dataframe_list:
-                if t[0] in hospitalization_day_to_reassign_dataframe.index:
-                    dist_old_hospital = m.get(t[0], 0)
-                    dist_new_hospital = d.get((t[0], '0' + str(t[1])), DEFAULT_DISTANCE)
-
-                    hospitalization_day_to_reassign_dataframe.at[t[0], 'codice_struttura_erogante_nuova'] = '0' + str(t[1])
-                    hospitalization_day_to_reassign_dataframe.at[t[0], 'distanza_vecchio_ospedale'] = dist_old_hospital
-                    hospitalization_day_to_reassign_dataframe.at[t[0], 'distanza_nuovo_ospedale'] = dist_new_hospital
-                    hospitalization_day_to_reassign_dataframe.at[t[0], 'discomfort'] = max(0, dist_new_hospital - dist_old_hospital)
 
     total_time = time.time() - start_time_total
     logging.info(f"Ottimizzazione completata. Tempo totale impiegato: {total_time:.2f} secondi.")

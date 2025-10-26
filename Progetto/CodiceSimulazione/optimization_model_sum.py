@@ -2,6 +2,7 @@ from gettext import install
 from math import sqrt
 
 import numpy as np
+from pyomo.common.enums import minimize
 from pyomo.opt import *
 import pyomo.environ as pyo
 
@@ -36,7 +37,7 @@ d = distanze con i nuovi ospedali
 
 # Variabile obbiettivo
 def obj_expression_norm_1(m):
-    return pyo.summation(m.delta)
+    return sum(m.delta[p] for p in m.P)
 
 
 def obj_expression_norm_2(m):
@@ -57,7 +58,7 @@ def patients_redistribution(m, h):
 
 
 def discomfort_calculation(m, p, h):
-    return m.delta[p] >= max(0,(m.d[p, h] - m.m[p])) * m.x[p, h]
+    return m.delta[p] >= (m.d[p, h] - m.m[p]) * m.x[p, h]
 
 def discomfort_calculation_q(m, p, h):
     return m.q[p] >= (max((m.d[p, h] - m.m[p]),0)**2) * m.x[p, h]
@@ -69,13 +70,9 @@ def dont_exceed_maximum_discomfort(m, p):
 def create_model(data, solver, time_limit, optimizer_model_type):
     # print(f'Inizio modello')
     model = pyo.AbstractModel()
-    opt = solvers.SolverFactory(solver)
-    if solver == 'cplex':
-        opt.options['timelimit'] = time_limit
-    elif solver == 'glpk':
-        opt.options['tmlim'] = time_limit
-    elif solver == 'gurobi':
-        opt.options['TimeLimit'] = time_limit
+    opt = solvers.SolverFactory(solver, executable="C:\\Program Files\\IBM\\ILOG\\CPLEX_Studio2211\\cplex\\bin\\x64_win64\\cplex.exe")
+    opt.options['timelimit'] = time_limit
+
     # Parametri
     model.P = pyo.Set(within=pyo.NonNegativeIntegers)
     model.H = pyo.Set(within=pyo.NonNegativeIntegers)
@@ -91,11 +88,11 @@ def create_model(data, solver, time_limit, optimizer_model_type):
         model.delta = pyo.Var(model.P, domain=pyo.NonNegativeReals)
     # Funzione obiettivo
     if optimizer_model_type == OptimizerModelType.NORM_1:
-        model.OBJ = pyo.Objective(rule=obj_expression_norm_1)
+        model.obj = pyo.Objective(rule=obj_expression_norm_1, sense=minimize)
     elif optimizer_model_type == OptimizerModelType.NORM_2:
-        model.OBJ = pyo.Objective(rule=obj_expression_norm_2)
+        model.obj = pyo.Objective(rule=obj_expression_norm_2, sense=minimize)
     elif optimizer_model_type == OptimizerModelType.NORM_INF:
-        model.OBJ = pyo.Objective(rule=obj_expression_norm_inf)
+        model.obj = pyo.Objective(rule=obj_expression_norm_inf, sense=minimize)
     # Vincoli
     model.PatientInOnlyOneHospital = pyo.Constraint(model.P, rule=patient_in_only_one_hospital)
     model.PatientsRedistribution = pyo.Constraint(model.H, rule=patients_redistribution)
@@ -106,7 +103,8 @@ def create_model(data, solver, time_limit, optimizer_model_type):
     if optimizer_model_type == OptimizerModelType.NORM_INF:
         model.DontExceedMaximumDiscomfort = pyo.Constraint(model.P, rule=dont_exceed_maximum_discomfort)
     model_instance = model.create_instance(data)
-    # model_instance.pprint()
+    # model_instance.write("model.lp")
+    # exit(0)
     results = opt.solve(model_instance)  # Solving del modello
 
     if (results.solver.status == SolverStatus.ok) and (
@@ -118,4 +116,5 @@ def create_model(data, solver, time_limit, optimizer_model_type):
     else:
         print(f'Solver Status: {results.solver.status}')
     print(f'Fine modello')
+
     return results, model_instance
