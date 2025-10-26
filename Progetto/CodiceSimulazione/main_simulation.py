@@ -259,7 +259,6 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                                                hospitalization_record_id_hosp,
                                                                                                hospitalization_record_id_spec)
 
-
             hospitalization_record_rest_time = int(hospitalization_record.loc['giorni_degenza'])
 
             hospitalization_record_recovery_date = hospitalization_record['data_ricovero'].strftime("%Y-%m-%d")
@@ -271,66 +270,67 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                                                                 hospitalization_record_id_hosp,
                                                                 hospitalization_record_id_spec)
 
-            # ottengo le due capacità
-            hosp_spec_max_beds_capacity = int(hospitalization_record_hospital_specialty_object.capacity[7])
-            hosp_spec_day_capacity = int(hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
-            # ci sono casi in cui la capacità giornaliera è 0, non li considero
-            if hosp_spec_day_capacity != 0:
-                # diminuisco di una percentuale arrotondando per difetto con
-                # vincolo sulla capacità
-                if hosp_spec_day_capacity > capacity_threshold:
-                    hosp_spec_day_capacity = int(hosp_spec_day_capacity -
-                                                 (hosp_spec_day_capacity * daily_percentage_reduction_capacity)
-                                                 )
-                # se la capacità diventa nulla la metto a 1
-                if hosp_spec_day_capacity == 0:
-                    hosp_spec_day_capacity = 1
+            if hospitalization_record_hospital_specialty_object is not None:
+                # ottengo le due capacità
+                hosp_spec_max_beds_capacity = int(hospitalization_record_hospital_specialty_object.capacity[7])
+                hosp_spec_day_capacity = int(hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
+                # ci sono casi in cui la capacità giornaliera è 0, non li considero
+                if hosp_spec_day_capacity != 0:
+                    # diminuisco di una percentuale arrotondando per difetto con
+                    # vincolo sulla capacità
+                    if hosp_spec_day_capacity > capacity_threshold:
+                        hosp_spec_day_capacity = int(hosp_spec_day_capacity -
+                                                     (hosp_spec_day_capacity * daily_percentage_reduction_capacity)
+                                                     )
+                    # se la capacità diventa nulla la metto a 1
+                    if hosp_spec_day_capacity == 0:
+                        hosp_spec_day_capacity = 1
 
-            # Inizio controllo vincoli
-            # Controllo se si è sforata la capacità massima di posti letto
-            if len(hospitalization_record_hospital_specialty_object.rest_queue) >= hosp_spec_max_beds_capacity:
-                # controllo se anche il giorno è pieno, vengono
-                # comunque inseriti nella coda della capacità massima ma il
-                # paziente ha una motivazione diversa
-                # DA RIVEDERE CODICE UGUALE
-                if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered >= hosp_spec_day_capacity:
-                    current_hospitalization_patient_object.queue_motivation = 'all_full'
-                    hospitalization_record_hospital_specialty_object.counter_max_queue = (
+                # Inizio controllo vincoli
+                # Controllo se si è sforata la capacità massima di posti letto
+                if len(hospitalization_record_hospital_specialty_object.rest_queue) >= hosp_spec_max_beds_capacity:
+                    # controllo se anche il giorno è pieno, vengono
+                    # comunque inseriti nella coda della capacità massima ma il
+                    # paziente ha una motivazione diversa
+                    # DA RIVEDERE CODICE UGUALE
+                    if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered >= hosp_spec_day_capacity:
+                        current_hospitalization_patient_object.queue_motivation = 'all_full'
+                        hospitalization_record_hospital_specialty_object.counter_max_queue = (
+                                hospitalization_record_hospital_specialty_object.
+                                counter_max_queue + 1)
+                        current_hospitalization_patient_object.counter_queue = (
                             hospitalization_record_hospital_specialty_object.
-                            counter_max_queue + 1)
-                    current_hospitalization_patient_object.counter_queue = (
-                        hospitalization_record_hospital_specialty_object.
-                        counter_max_queue)
-                    hospitalization_record_hospital_specialty_object.waiting_queue.append(
-                        current_hospitalization_patient_object)
+                            counter_max_queue)
+                        hospitalization_record_hospital_specialty_object.waiting_queue.append(
+                            current_hospitalization_patient_object)
+                    else:
+                        current_hospitalization_patient_object.queue_motivation = 'hospital_speciality_beds_full'
+                        hospitalization_record_hospital_specialty_object.counter_max_queue = (
+                                hospitalization_record_hospital_specialty_object.
+                                counter_max_queue + 1)
+                        current_hospitalization_patient_object.counter_queue = (
+                            hospitalization_record_hospital_specialty_object.
+                            counter_max_queue)
+                        hospitalization_record_hospital_specialty_object.waiting_queue.append(
+                            current_hospitalization_patient_object)
                 else:
-                    current_hospitalization_patient_object.queue_motivation = 'hospital_speciality_beds_full'
-                    hospitalization_record_hospital_specialty_object.counter_max_queue = (
+                    # Controllo se si è sforata la capacità giornaliera massima
+                    if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered >= hosp_spec_day_capacity:
+                        current_hospitalization_patient_object.queue_motivation = 'hospital_speciality_capacity_day_full'
+                        hospitalization_record_hospital_specialty_object.counter_day_queue = (
+                                hospitalization_record_hospital_specialty_object.
+                                counter_day_queue + 1)
+                        current_hospitalization_patient_object.counter_queue = (
                             hospitalization_record_hospital_specialty_object.
-                            counter_max_queue + 1)
-                    current_hospitalization_patient_object.counter_queue = (
-                        hospitalization_record_hospital_specialty_object.
-                        counter_max_queue)
-                    hospitalization_record_hospital_specialty_object.waiting_queue.append(
-                        current_hospitalization_patient_object)
-            else:
-                # Controllo se si è sforata la capacità giornaliera massima
-                if hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered >= hosp_spec_day_capacity:
-                    current_hospitalization_patient_object.queue_motivation = 'hospital_speciality_capacity_day_full'
-                    hospitalization_record_hospital_specialty_object.counter_day_queue = (
-                            hospitalization_record_hospital_specialty_object.
-                            counter_day_queue + 1)
-                    current_hospitalization_patient_object.counter_queue = (
-                        hospitalization_record_hospital_specialty_object.
-                        counter_day_queue)
-                    hospitalization_record_hospital_specialty_object.waiting_queue.append(
-                        current_hospitalization_patient_object)
-                else:
-                    hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered = (
-                            hospitalization_record_hospital_specialty_object.
-                            counter_current_day_patients_recovered + 1)
-                    hospitalization_record_hospital_specialty_object.rest_queue.append(
-                        current_hospitalization_patient_object)
+                            counter_day_queue)
+                        hospitalization_record_hospital_specialty_object.waiting_queue.append(
+                            current_hospitalization_patient_object)
+                    else:
+                        hospitalization_record_hospital_specialty_object.counter_current_day_patients_recovered = (
+                                hospitalization_record_hospital_specialty_object.
+                                counter_current_day_patients_recovered + 1)
+                        hospitalization_record_hospital_specialty_object.rest_queue.append(
+                            current_hospitalization_patient_object)
 
         # ANTICIPO PAZIENTI
         # Controllo se posso anticipare l'ingresso di pazienti nei prossimi
@@ -355,8 +355,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
                         hosp_spec_list_object,
                         hospitalization_record_id_hosp,
                         hospitalization_record_id_spec)
-                    if hospitalization_record_hospital_specialty_object != 'None':
-
+                    if hospitalization_record_hospital_specialty_object is not None:
                         if len(hospitalization_record_hospital_specialty_object.rest_queue) < hosp_spec_max_beds_capacity:
                             hosp_spec_day_capacity = int(
                                 hospitalization_record_hospital_specialty_object.capacity[day_of_the_week_number])
