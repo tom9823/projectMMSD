@@ -37,8 +37,6 @@ def get_hospitalization_hospital(hosp_object_list, hospitalization_record_id_hos
                     target_hospital = h
     except TypeError:
         print("Invalid integer value",hospitalization_record_id_spec, h.id_spec)
-    if target_hospital is None:
-        print("!|^!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
     return target_hospital
 
 

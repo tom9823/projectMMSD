@@ -18,7 +18,7 @@ import objects_classes as oc
 import remove_resources as rr
 import reassing_hospital as rh
 
-DEFAULT_DISTANCE = 50000  # distanza in m se non si trova la corrispondenza
+DEFAULT_DISTANCE = 50000.0  # distanza in m se non si trova la corrispondenza
 
 
 def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, policy_resources, solver, time_limit, name):
@@ -455,7 +455,7 @@ setup_logging()
 
 def get_distance(row, distances):
     if row.id_comune_struttura_erogante == row.id_comune_paziente:
-        return 0
+        return 0.0
     else:
         comune_paziente = row.id_comune_paziente
         comune_struttura = row.id_comune_struttura_erogante
@@ -514,8 +514,8 @@ def main():
         get_distance(row, dict_distances_between_com)
         for row in hospitalizations[["id_comune_paziente", "id_comune_struttura_erogante"]].itertuples(index=False)
     ]
-    hospitalizations['distanza_nuovo_ospedale'] = 0
-    hospitalizations['discomfort'] = 0
+    hospitalizations['distanza_nuovo_ospedale'] = 0.0
+    hospitalizations['discomfort'] = 0.0
     elapsed = time.perf_counter() - t0
     logging.info(f"Calcolo distanza vecchio ospedale completato in {elapsed:.2f} secondi.")
 

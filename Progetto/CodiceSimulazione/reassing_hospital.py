@@ -225,10 +225,10 @@ def optimization_reassing(simulation_day_index, upper_threshold_simulation_day_i
                             dist_old_hospital = m.get(t[0], 0)
                             dist_new_hospital = d.get((t[0], t[1]), DEFAULT_DISTANCE)
 
-                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'codice_struttura_erogante_nuova'] = f"0{t[1]}"
-                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'distanza_vecchio_ospedale'] = dist_old_hospital
-                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'distanza_nuovo_ospedale'] = dist_new_hospital
-                            hospitalization_day_to_reassign_dataframe_list[i].at[t[0], 'discomfort'] = max(0, dist_new_hospital - dist_old_hospital)
+                            hospitalization_day_to_reassign_dataframe_list[i].at[str(t[0]), 'codice_struttura_erogante_nuova'] = f"0{t[1]}"
+                            hospitalization_day_to_reassign_dataframe_list[i].at[str(t[0]), 'distanza_vecchio_ospedale'] = dist_old_hospital
+                            hospitalization_day_to_reassign_dataframe_list[i].at[str(t[0]), 'distanza_nuovo_ospedale'] = dist_new_hospital
+                            hospitalization_day_to_reassign_dataframe_list[i].at[str(t[0]), 'discomfort'] = max(0, dist_new_hospital - dist_old_hospital)
             else:
                 logging.info(f"Non sono presenti ospedali possibili per la specialità corrente: {current_spec_id}.")
 
