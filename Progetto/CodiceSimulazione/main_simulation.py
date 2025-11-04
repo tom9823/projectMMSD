@@ -37,6 +37,7 @@ def start_simulation(hospitalization_dataframe, hosp_dict, resources_to_remove, 
     """
     logging.info(f"Inizio esecuzione start_simulation()")
     start_time_total = time.perf_counter()
+    start = time.time()
 
     # --- Informazioni sulle risorse da rimuovere ---
     logging.info(f"Risorse da rimuovere: {len(resources_to_remove[0])} ospedali, {len(resources_to_remove[1])} specialità, a partire da data: {resources_to_remove[2]}")
